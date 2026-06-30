@@ -1,0 +1,18 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Chỉ copy package.json trước để tận dụng Docker Cache cho node_modules
+COPY package*.json ./
+
+RUN npm install
+
+# Copy toàn bộ mã nguồn còn lại vào container
+COPY . .
+
+ENV NEXT_PUBLIC_API_URL=http://localhost:8000
+
+EXPOSE 3000
+
+# Chạy lệnh dev để hỗ trợ Hot-reload khi thay đổi code ở máy thật
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # ─── FASTAPI BACKEND SERVICE ────────────────────────────────────────
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: learning_aid_backend
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app 
+    env_file:
+      - ./backend/.env.dev
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # command: >
+    #   bash -c "
+    #   echo \"[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] [Infra] Đang chờ MySQL (Cổng 3306) sẵn sàng...\";
+    #   until exec 3<>/dev/tcp/db/3306; do
+    #     sleep 1;
+    #   done 2>/dev/null;
+    #   echo \"[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] [Infra] Cổng MySQL đã mở. Đang khởi chạy Uvicorn server...\";
+    #   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude \"app.log\"
+    #   "
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude "app.log"
+    networks:
+      - learning_aid_network
+
+ # ─── NEXTJS FRONTEND SERVICE ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: learning_aid_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules 
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    env_file:
+      - ./frontend/.env.local
+    depends_on:
+      - backend
+    networks:
+      - learning_aid_network
+
+  # ─── MYSQL DATABASE SERVICE ─────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: learning_aid_mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    env_file:
+      - ./backend/.env.dev
+    environment:  
+      MYSQL_ROOT_PASSWORD: "mysql123456"      
+      MYSQL_DATABASE: "learning_aid_db"
+      MYSQL_ROOT_HOST: "%"
+    volumes:
+      - learning_aid_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - learning_aid_network
+
+  # ─── REDIS CACHE SERVICE ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: learning_aid_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - learning_aid_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - learning_aid_network
+
+# ─── QUẢN LÝ MẠNG VÀ DỮ LIỆU (VOLUMES & NETWORKS) ────────────────────
+networks:
+  learning_aid_network:
+    driver: bridge
+
+volumes:
+  learning_aid_mysql_data:
+  learning_aid_redis_data:

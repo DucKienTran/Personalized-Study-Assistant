@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode/
+
+.venv/
+venv/
+
+**/__pycache__
+**/*.pyc
+
+*.log
+app.log
+
+docker-compose*
+.dockerignore
+
+.env.example
