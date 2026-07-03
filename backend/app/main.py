@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.sql import text
 
+import app.models
 from app.api.v1.users import router as users_router
 from app.api.v1.auth import router as auth_router
 from app.core.mysql import engine, Base

@@ -1,52 +1,20 @@
-# ========================
-# CẤU HÌNH HỆ THỐNG & OS
-# ========================
+# ==========================================
+# SYSTEM & IDE CONFIGS (File rác hệ điều hành / IDE)
+# ==========================================
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-*.log
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# ========================
-# BIẾN MÔI TRƯỜNG & BẢO MẬT
-# ========================
+# ==========================================
+# GLOBAL SECRETS & DOCKER
+# ==========================================
 .env
-.env.local
-.env.dev
-.env.prod
-*.pem
-*.key
-
-# ========================
-# FRONTEND (Next.js & Node)
-# ========================
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/build/
-frontend/dist/
-frontend/npm-debug.log*
-frontend/yarn-error.log*
-
-# ========================
-# BACKEND (FastAPI & Python)
-# ========================
-# Môi trường ảo
-backend/venv/
-backend/env/
-backend/.venv/
-
-# Cache và build Python
-backend/__pycache__/
-backend/*.py[cod]
-backend/*$py.class
-backend/.pytest_cache/
-backend/.coverage
-backend/htmlcov/
-
-# Thư mục lưu trữ tạm thời (Quan trọng: Không đẩy file người dùng lên Git)
-uploads/
-backend/uploads/
-
-# Database cục bộ (Nếu có test bằng SQLite)
-*.sqlite3
+.env.*
+!.env.example
+.docker/

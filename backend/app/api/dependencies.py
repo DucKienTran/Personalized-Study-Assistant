@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 from app.core.config import settings
 from app.core.mysql import SessionLocal
 from app.core.redis import redis_client
-from app.models.user_model import UserModel
+from app.models.user_model import User
 from app.core.security import decode_token
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ async def get_current_user(
     payload = decode_token(token, expected_type="access")
     
     email = payload.get("sub")
-    user = db.query(UserModel).filter(UserModel.email == email).first()
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         logger.warning(f"Xác thực thất bại: Token hợp lệ nhưng không tìm thấy Email '{email}' trong Database.")
         raise HTTPException(

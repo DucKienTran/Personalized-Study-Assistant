@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 
 from app.api.dependencies import get_db, get_redis, get_current_user
 from app.core.config import settings
-from app.models.user_model import UserModel
+from app.models.user_model import User
 from app.schemas.user_schema import UserResponse, ChangePassword, UserStatus
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 
@@ -21,7 +21,7 @@ REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
 # API get me
 # ==========================================
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: UserModel = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     logger.info(f"Truy cập thông tin cá nhân thành công: {current_user.id}, {current_user.email}, {current_user.role}")
     return current_user
 
@@ -30,7 +30,7 @@ def get_me(current_user: UserModel = Depends(get_current_user)):
 # ==========================================
 @router.get("/all", response_model=List[UserResponse])
 def get_all_users(
-    current_user: UserModel = Depends(get_current_user), 
+    current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
     if current_user.role != "admin":
@@ -43,13 +43,13 @@ def get_all_users(
         )
     
     logger.info(f"Truy cập danh sách người dùng thành công: ADMIN [{current_user.id}, {current_user.email}]")
-    users = db.query(UserModel).all()
+    users = db.query(User).all()
     return users
 
 # ==========================================
 # Helper: Xử lý logic trạng thái Online/Offline
 # ==========================================
-async def _format_user_status(target_user: UserModel, redis: Redis) -> dict:
+async def _format_user_status(target_user: User, redis: Redis) -> dict:
     """Hàm helper để tính toán trạng thái và thời gian offline của một user"""
     user_id = target_user.id
     user_email = target_user.email 
@@ -107,7 +107,7 @@ async def _format_user_status(target_user: UserModel, redis: Redis) -> dict:
 @router.get("/get-status", status_code=status.HTTP_200_OK, response_model=Union[UserStatus, List[UserStatus]]) 
 async def get_user_status(
     target_id: Optional[int] = None,
-    current_user: UserModel = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
@@ -120,14 +120,14 @@ async def get_user_status(
     
     # Xem cho 1 người
     if target_id:
-        target_user = db.query(UserModel).filter(UserModel.id == target_id).first()
+        target_user = db.query(User).filter(User.id == target_id).first()
         if not target_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy người dùng này.")
         
         return await _format_user_status(target_user, redis)
     
     # Xem tất cả mọi người
-    all_users = db.query(UserModel).all()
+    all_users = db.query(User).all()
     all_statuses = [await _format_user_status(u, redis) for u in all_users]
     
     return all_statuses
@@ -139,7 +139,7 @@ async def get_user_status(
 async def change_password(
     data: ChangePassword, 
     response: Response,
-    current_user: UserModel = Depends(get_current_user), 
+    current_user: User = Depends(get_current_user), 
     refresh_token: str = Cookie(None),
     db: Session = Depends(get_db),
     redis: Redis = Depends(get_redis)
@@ -232,7 +232,7 @@ async def delete_account(
     response: Response,
     target_id: Optional[int] = None,  
     refresh_token: str = Cookie(None),  
-    current_user: UserModel = Depends(get_current_user), 
+    current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
@@ -248,7 +248,7 @@ async def delete_account(
                 detail="Bạn không có quyền xóa tài khoản của người khác."
             )
         
-        user_to_delete = db.query(UserModel).filter(UserModel.id == target_id).first()
+        user_to_delete = db.query(User).filter(User.id == target_id).first()
         if not user_to_delete:
             logger.warning("Không tìm thấy tài khoản cần xóa trong database")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tài khoản cần xóa.")

@@ -6,7 +6,7 @@ from redis.asyncio import Redis
 
 from app.api.dependencies import get_db, get_redis
 from app.core.config import settings
-from app.models.user_model import UserModel
+from app.models.user_model import User
 from app.schemas.user_schema import UserRegister, UserResponse, UserLogin
 from app.schemas.token_schema import TokenResponse
 from app.core.security import (
@@ -25,7 +25,7 @@ ONLINE_STATUS_EXPIRE_SECONDS = settings.ONLINE_STATUS_EXPIRE_SECONDS
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_client(user_data: UserRegister, db: Session = Depends(get_db)):
-    existing_user = db.query(UserModel).filter(UserModel.email == user_data.email).first()
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         logger.warning(f"Đăng ký client thất bại: Email {user_data.email} đã tồn tại")
         raise HTTPException(
@@ -35,7 +35,7 @@ def register_client(user_data: UserRegister, db: Session = Depends(get_db)):
     
     hashed_pass = hash_password(user_data.password)
     
-    new_user = UserModel(
+    new_user = User(
         email=user_data.email,
         password=hashed_pass,  
         role="client",
@@ -58,7 +58,7 @@ def register_admin(user_data: UserRegister, admin_key: str, db: Session = Depend
             detail="Mã xác thực Admin không hợp lệ."
         )
     
-    existing_user = db.query(UserModel).filter(UserModel.email == user_data.email).first()
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         logger.warning(f"Đăng ký admin thất bại: Email {user_data.email} đã tồn tại")
         raise HTTPException(
@@ -68,7 +68,7 @@ def register_admin(user_data: UserRegister, admin_key: str, db: Session = Depend
     
     hashed_pass = hash_password(user_data.password)
     
-    new_user = UserModel(
+    new_user = User(
         email=user_data.email,
         password=hashed_pass,  
         role="admin",
@@ -89,7 +89,7 @@ async def login_user(
     db: Session = Depends(get_db),
     redis: Redis = Depends(get_redis) 
 ):  
-    target_user = db.query(UserModel).filter(UserModel.email == form_data.email).first()
+    target_user = db.query(User).filter(User.email == form_data.email).first()
             
     if not target_user or not verify_password(form_data.password, target_user.password):
         logger.warning(f"Đăng nhập thất bại: Email {form_data.email} không tồn tại hoặc sai mật khẩu")
@@ -149,7 +149,7 @@ async def refresh_token(
     user_email = payload.get("sub")
     user_role = payload.get("role")
 
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         logger.warning("Tài khoản không tồn tại, đã bị xóa hoặc vô hiệu hóa.")
         raise HTTPException(
