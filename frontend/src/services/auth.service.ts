@@ -12,8 +12,13 @@ export const authService = {
   
   // Logout api
   logout: async () => {
-    const response = await api.post("/auth/logout");
-    return response.data;
+    try {
+      const response = await api.post("/auth/logout");
+      return response.data;
+    } finally {
+      // Luôn xoá local storage dù API thành công hay lỗi
+      localStorage.removeItem("access_token");
+    }
   },
 
   // Register

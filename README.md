@@ -161,3 +161,14 @@ learning-aid/
     ├── tailwind.config.ts
     └── next.config.ts
 ```
+
+## 4. ERD MySQL
+
+```
+users (1) ──────< (n) documents
+  │                      │
+  │                      │
+  └──< (n) quiz_results  └──< (n) quizzes
+                                    │
+                                    └──< (n) quiz_questions
+```
