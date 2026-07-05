@@ -3,13 +3,12 @@ import type { NextRequest } from "next/server";
 import { AUTH_CONFIG } from "@/constants/auth";
 
 export function middleware(request: NextRequest) {
-  // Lấy token từ Cookie gửi lên
+  
   const token = request.cookies.get(AUTH_CONFIG.COOKIE_NAME)?.value;    
   const { pathname } = request.nextUrl;
 
   // Trường hợp người dùng cố tính vào dashboard và mà chưa đăng nhập
   if (pathname.startsWith("/dashboard") && !token) {
-    // Đá ngược người dùng về trang Login
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

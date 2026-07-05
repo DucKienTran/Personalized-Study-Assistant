@@ -8,14 +8,11 @@ export default function LogoutButton() {
   const router = useRouter();
 
   const handleLogout = async () => {
-    try {
-      await authService.logout(); 
+      try {
+      await authService.logout();
     } catch (err) {
       console.error("Lỗi gọi API logout:", err);
     } finally {
-      // Xóa token, cookie và điều hướng về trang đăng nhập
-      localStorage.removeItem("token");
-      document.cookie = `${AUTH_CONFIG.COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       router.push("/login");
     }
   };

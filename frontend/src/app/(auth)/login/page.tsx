@@ -6,7 +6,6 @@
   import { authService } from "@/services/auth.service";
   import RedirectLoading from "@/components/states/RedirectLoading";
   import { APP_CONFIG } from "@/constants/app"; 
-  import { AUTH_CONFIG } from "@/constants/auth";
 
   export default function LoginPage() {
     const router = useRouter();
@@ -36,8 +35,7 @@
 
       try {
         const data = await authService.login(email, password);
-        localStorage.setItem("token", data.access_token);
-        document.cookie = `${AUTH_CONFIG.COOKIE_NAME}=${data.access_token}; path=/; max-age=${AUTH_CONFIG.COOKIE_MAX_AGE}; SameSite=Strict`;
+        localStorage.setItem("access_token", data.access_token);
         setShowRedirectLoading(true);
 
         setTimeout(() => {
