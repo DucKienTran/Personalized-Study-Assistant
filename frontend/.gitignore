@@ -34,3 +34,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# File rác
+*.lnk
