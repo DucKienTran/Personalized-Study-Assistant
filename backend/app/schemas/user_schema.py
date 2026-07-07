@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import (
     BaseModel,
@@ -15,6 +15,13 @@ from typing_extensions import Self
 
 class UserRegister(BaseModel):
     email: EmailStr
+    username: str = Field(
+        ...,
+        min_length=3,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_]+$",
+        description="Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới",
+    )
     password: str = Field(..., min_length=8, description="Mật khẩu phải có ít nhất 8 ký tự.")
     confirm_password: str = Field(
         ..., min_length=8, description="Mật khẩu mới phải có ít nhất 8 ký tự."
@@ -88,9 +95,13 @@ class UserLogin(BaseModel):
 
 
 class UserResponse(BaseModel):
+    """
+    Schema đại diện cho dữ liệu trả về cho client khi truy vấn thông tin người dùng.
+    """
+
     id: int
     email: EmailStr
-    role: str
+    role_name: str
 
     full_name: Optional[str] = None
     is_active: bool
@@ -98,3 +109,14 @@ class UserResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CurrentUser(BaseModel):
+    """
+    Schema đại diện cho dữ liệu giải mã từ JWT Token.
+    """
+
+    id: int
+    email: EmailStr
+    role: str
+    permissions: List[str] = Field(default_factory=list)
