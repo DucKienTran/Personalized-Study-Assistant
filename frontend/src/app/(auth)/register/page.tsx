@@ -10,6 +10,7 @@ import { APP_CONFIG } from "@/constants/app";
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,41 +31,52 @@ export default function RegisterPage() {
     try {
       await authService.register({
         email: email,
+        username: username,
         password: password,
         confirm_password: confirmPassword,
       });
 
       setShowRedirectLoading(true);
-      
+
       setTimeout(() => {
         router.push("/login");
       }, 2000);
 
     } catch (err: any) {
       const errorData = err.response?.data?.detail;
-      setError(Array.isArray(errorData) ? (errorData[0]?.msg || "Dữ liệu không hợp lệ.") : errorData || "Đăng ký thất bại!");
+      setError(Array.isArray(errorData) ? errorData[0]?.msg : errorData || "Đăng ký thất bại, vui lòng thử lại.");
       setLoading(false);
     }
   };
 
   if (showRedirectLoading) {
-    return <RedirectLoading message="Đăng ký thành công! Đang chuyển hướng..." />;
+    return <RedirectLoading message="Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập..." />;
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex items-center justify-center bg-[#f3e8ff] font-sans m-0 p-4 select-none">
-      <div className="w-full max-w-[400px] bg-white p-8 sm:p-10 rounded-2xl shadow-sm border border-[#e9d5ff]">
-        
+    <div className="min-h-screen flex items-center justify-center bg-[#faf5ff] p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff]">
         <div className="text-center mb-8">
-          <h1 className="text-[26px] font-semibold tracking-[1px] text-[#581c87] font-serif">
-            {APP_CONFIG.NAME}
-          </h1>
+          <h1 className="text-3xl font-bold text-[#581c87] mb-2">{APP_CONFIG.NAME}</h1>
+          <p className="text-sm text-[#7e22ce]">Tạo tài khoản mới của bạn</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Địa chỉ Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]" placeholder="user@example.com" />
+            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Tên đăng nhập </label>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]"
+              placeholder="nhan_vien_v1"
+            />
+          </div>
+
+          <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
+            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Email</label>
+            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]" placeholder="name@example.com" />
           </div>
 
           <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
@@ -90,11 +102,12 @@ export default function RegisterPage() {
           </div>
         </form>
 
-        <div className="mt-4 text-center text-[13px] text-[#7e22ce]">
+        <div className="text-center mt-6 text-[13px] text-[#6b21a8]">
           Đã có tài khoản?{" "}
-          <Link href="/login" className="font-semibold text-[#7c3aed] hover:underline ml-1">Đăng nhập</Link>
+          <Link href="/login" className="font-semibold text-[#7c3aed] hover:underline">
+            Đăng nhập ngay
+          </Link>
         </div>
-
       </div>
     </div>
   );
