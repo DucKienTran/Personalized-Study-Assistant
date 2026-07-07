@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="antialiased text-gray-900 bg-gray-50">
-        {/* Children ở đây sẽ là trang Login, Register, hoặc Dashboard tùy URL */}
+        {/* Trang Login, Register, hoặc Dashboard tùy URL */}
         {children}
       </body>
     </html>
