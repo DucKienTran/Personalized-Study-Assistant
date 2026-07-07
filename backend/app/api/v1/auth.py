@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from app.api.dependencies import get_auth_service
 from app.core.config import settings
@@ -16,7 +16,7 @@ REFRESH_COOKIE_MAX_AGE = settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_client(user_data: UserRegister, service: AuthService = Depends(get_auth_service)):
-    return service.register(user_data, role="client")
+    return service.register(user_data, role_name="client")
 
 
 @router.post("/register-admin", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -32,7 +32,7 @@ def register_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Mã xác thực Admin không hợp lệ."
         )
-    return service.register(user_data, role="admin")
+    return service.register(user_data, role_name="admin")
 
 
 # Helper giúp set cookie refresh token trong response
@@ -50,10 +50,11 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 @router.post("/login", response_model=TokenResponse)
 async def login_user(
     response: Response,
+    request: Request,
     form_data: UserLogin,
     service: AuthService = Depends(get_auth_service),
 ):
-    result = await service.login(form_data)
+    result = await service.login(form_data, request)
     _set_refresh_cookie(response, result.pop("refresh_token"))
     return result
 
@@ -61,10 +62,11 @@ async def login_user(
 @router.post("/token/refresh", response_model=TokenResponse)
 async def refresh_token(
     response: Response,
+    request: Request,
     refresh_token: str = Cookie(None),
     service: AuthService = Depends(get_auth_service),
 ):
-    result = await service.refresh(refresh_token)
+    result = await service.refresh(refresh_token, request)
     _set_refresh_cookie(response, result.pop("refresh_token"))
     return result
 
