@@ -9,12 +9,12 @@ from sqlalchemy.orm import configure_mappers
 from sqlalchemy.sql import text
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.documents import router as documents_router
 from app.api.v1.users import router as users_router
 from app.core.config import settings
 from app.core.logger import setup_logging
 from app.core.mysql import Base, engine
 from app.core.redis import redis_client
-import app.models
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -63,6 +63,8 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(
@@ -91,6 +93,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
+app.include_router(documents_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

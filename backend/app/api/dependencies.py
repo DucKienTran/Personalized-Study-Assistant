@@ -13,8 +13,9 @@ from app.core.redis import redis_client
 from app.core.security import decode_token
 from app.models.user_model import User
 from app.services.auth_service import AuthService
-from app.services.user_service import UserService
+from app.services.document.parser import DocumentParserService
 from app.services.presence_service import PresenceService
+from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -29,6 +30,10 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_document_parser_service(db: Session = Depends(get_db)) -> DocumentParserService:
+    return DocumentParserService(db)
 
 
 async def get_redis() -> AsyncGenerator[Redis, None]:
