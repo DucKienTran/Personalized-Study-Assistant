@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import time
+from typing import List
+import uuid
 
 from fastapi import HTTPException, status
 import jwt
@@ -28,6 +30,10 @@ REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
 
 
 def create_access_token(data: dict) -> str:
+    """
+    Tạo Access Token.
+    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
+    """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "token_type": "access"})
@@ -35,10 +41,37 @@ def create_access_token(data: dict) -> str:
 
 
 def create_refresh_token(data: dict) -> str:
+    """
+    Tạo Refresh Token.
+    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
+    """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def generate_tokens_pair(user_id: int, email: str, role_name: str, permissions: List[str]) -> dict:
+    """
+    Hàm tạo cả cặp token Access & Refresh
+    """
+    token_jti = str(uuid.uuid4())
+
+    access_payload = {
+        "id": user_id,
+        "sub": email,
+        "role": role_name,
+        "permissions": permissions,
+        "jti": token_jti,
+    }
+    refresh_payload = {"id": user_id, "sub": email, "jti": token_jti}
+
+    return {
+        "access_token": create_access_token(access_payload),
+        "refresh_token": create_refresh_token(refresh_payload),
+        "token_type": "bearer",
+        "jti": token_jti,
+    }
 
 
 def decode_token(token: str, expected_type: str, raise_on_error: bool = True) -> dict:
