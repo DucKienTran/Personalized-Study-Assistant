@@ -1,23 +1,23 @@
+from datetime import UTC, datetime
 import logging
 import time
 from typing import List, Optional, Union
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import (
     blacklist_refresh_token,
-    create_access_token,
-    create_refresh_token,
     decode_token,
+    generate_tokens_pair,
     hash_password,
     is_refresh_token_blacklisted,
     verify_password,
 )
-from app.models.user_model import User
-from app.schemas.user_schema import ChangePassword
+from app.models.user_model import RefreshToken, User
+from app.schemas.user_schema import ChangePassword, CurrentUser
 from app.services.presence_service import PresenceService
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,57 @@ class UserService:
         self.redis = redis
         self.presence = presence
 
-    def get_all_users(self, current_user: User) -> List[User]:
+    def get_user_profile(self, current_user: CurrentUser) -> User:
+        user = self.db.query(User).filter(User.id == current_user.id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại."
+            )
+        return user
+
+    async def _revoke_all_user_tokens(self, user_id: int) -> None:
+        await self.redis.setex(f"user:revoked:{user_id}", 86400 * 7, "true")
+        await self.presence.clear_online_status(user_id)
+        logger.info(f"Đã kích hoạt cờ thu hồi toàn bộ phiên làm việc của User ID [{user_id}]")
+        (
+            self.db.query(RefreshToken)
+            .filter(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked.is_(False),
+            )
+            .update(
+                {"revoked": True},
+                synchronize_session=False,
+            )
+        )
+        self.db.commit()
+
+    def _save_refresh_token(
+        self,
+        user_id: int,
+        refresh_token: str,
+        jti: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> None:
+        payload = decode_token(
+            refresh_token,
+            expected_type="refresh",
+        )
+
+        db_token = RefreshToken(
+            user_id=user_id,
+            jti=jti,
+            revoked=False,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            expired_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
+        )
+
+        self.db.add(db_token)
+        self.db.commit()
+
+    def get_all_users(self, current_user: CurrentUser) -> List[User]:
         if current_user.role != "admin":
             logger.warning(
                 f"Truy cập trái phép: [{current_user.id}, {current_user.email}, {current_user.role}] "
@@ -49,7 +99,7 @@ class UserService:
         return self.db.query(User).all()
 
     async def get_status(
-        self, current_user: User, target_id: Optional[int]
+        self, current_user: CurrentUser, target_id: Optional[int]
     ) -> Union[dict, List[dict]]:
         if current_user.role != "admin":
             logger.warning(
@@ -82,7 +132,7 @@ class UserService:
         base = {
             "user_id": user_id,
             "email": target_user.email,
-            "role": target_user.role,
+            "role": target_user.role.name,
             "last_active": last_active_int,
         }
 
@@ -105,15 +155,24 @@ class UserService:
         return {**base, "status": "offline", "message": message}
 
     async def change_password(
-        self, current_user: User, data: ChangePassword, refresh_token: Optional[str]
+        self,
+        current_user: CurrentUser,
+        data: ChangePassword,
+        refresh_token: Optional[str],
+        request: Request,
     ) -> dict:
-        if not verify_password(data.old_password, current_user.password):
+        db_user = self.db.query(User).filter(User.id == current_user.id).first()
+        if not db_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại."
+            )
+        if not verify_password(data.old_password, db_user.password_hash):
             logger.warning(f"Đổi mật khẩu thất bại: [{current_user.id}] nhập sai mật khẩu cũ.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu cũ không chính xác."
             )
 
-        if verify_password(data.new_password, current_user.password):
+        if verify_password(data.new_password, db_user.password_hash):
             logger.warning(
                 f"Đổi mật khẩu thất bại: [{current_user.id}] mật khẩu mới trùng mật khẩu cũ."
             )
@@ -145,18 +204,35 @@ class UserService:
                 detail="Thông tin xác thực không đồng nhất.",
             )
 
-        current_user.password = hash_password(data.new_password)
+        db_user.password_hash = hash_password(data.new_password)
         self.db.commit()
         logger.info(f"Đổi mật khẩu thành công: [{current_user.id}, {current_user.email}]")
 
         await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
-        new_payload = {"id": current_user.id, "sub": current_user.email, "role": current_user.role}
-        new_refresh_token = create_refresh_token(new_payload)
+        await self._revoke_all_user_tokens(db_user.id)
+        await self.redis.delete(f"user:revoked:{db_user.id}")
 
-        logger.info(f"Cấp lại token thành công sau đổi mật khẩu: [{current_user.id}]")
+        tokens = generate_tokens_pair(
+            user_id=db_user.id,
+            email=db_user.email,
+            role_name=db_user.role.name,
+            permissions=[p.name for p in db_user.role.permissions],
+        )
+        self._save_refresh_token(
+            user_id=db_user.id,
+            refresh_token=tokens["refresh_token"],
+            jti=tokens["jti"],
+            ip_address=request.client.host,
+            user_agent=request.headers.get("User-Agent"),
+        )
+
+        await self.presence.mark_online(db_user.id)
+
+        logger.info(f"Cấp lại token thành công sau đổi mật khẩu cho user: [{db_user.id}]")
+
         return {
-            "access_token": create_access_token(new_payload),
-            "refresh_token": new_refresh_token,
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens["refresh_token"],
             "token_type": "bearer",
             "detail": "Thay đổi mật khẩu thành công.",
         }
@@ -167,36 +243,26 @@ class UserService:
         is_self_deletion = (target_id is None) or (target_id == current_user.id)
 
         if is_self_deletion:
-            user_to_delete = current_user
+            user_to_delete = self.db.query(User).filter(User.id == current_user.id).first()
         else:
-            if current_user.role != "admin":
-                logger.warning(
-                    f"[{current_user.id}] cố gắng xóa tài khoản [{target_id}] mà không có quyền."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Bạn không có quyền xóa tài khoản của người khác.",
-                )
+            if current_user.role.name != "admin":
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền.")
             user_to_delete = self.db.query(User).filter(User.id == target_id).first()
+
             if not user_to_delete:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Không tìm thấy tài khoản cần xóa.",
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tài khoản."
                 )
 
         user_info = f"[{user_to_delete.id}, {user_to_delete.email}, {user_to_delete.role}]"
 
-        await self.presence.clear_online_status(user_to_delete.id)
+        await self._revoke_all_user_tokens(user_to_delete.id)
 
         logger.info(f"Xóa tài khoản người dùng: {user_info} khỏi database.")
         self.db.delete(user_to_delete)
         self.db.commit()
 
         if is_self_deletion:
-            if refresh_token:
-                payload = decode_token(refresh_token, expected_type="refresh", raise_on_error=False)
-                if payload:
-                    await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp", 0))
             logger.info(f"Tài khoản {user_info} đã tự xóa thành công.")
             return {
                 "detail": "Tài khoản của bạn đã bị xóa vĩnh viễn khỏi hệ thống.",
