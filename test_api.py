@@ -2,7 +2,7 @@ import time
 
 from google import genai
 
-API_KEY_1 = ""git add test_api.py
+API_KEY_1 = ""
 API_KEY_2 = ""
 
 MODEL = "gemini-2.5-flash"

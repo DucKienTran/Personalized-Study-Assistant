@@ -1,5 +1,7 @@
 import os
 
+from fastapi import HTTPException
+
 from bson import ObjectId
 import google.generativeai as genai
 
@@ -17,7 +19,7 @@ class AISummarizerService:
 
         genai.configure(api_key=api_key)
         # Sử dụng model gemini-1.5-flash: Rất nhanh, rẻ/miễn phí, xử lý text dài cực tốt
-        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        self.model = genai.GenerativeModel("models/gemini-2.5-flash")
 
     async def generate_summary(self, mongo_id: str, level: str, format_type: str, instruction: str):
         doc = await self.collection.find_one({"_id": ObjectId(mongo_id)})
@@ -35,19 +37,27 @@ class AISummarizerService:
             print(f"[Cache Hit] Đã trả về kết quả cũ cho config: {cache_key}")
             return doc["summaries"][cache_key]
 
-        # 4. Nếu chưa có Cache -> Build Prompt
         prompt = SummaryPromptBuilder.build(content_raw, level, format_type, instruction)
 
         # --- ĐÂY LÀ ĐOẠN GỌI AI THẬT ---
         try:
             print("[AI Gọi] Đang nhờ Gemini đọc và tóm tắt...")
-            # Gọi Gemini xử lý prompt bất đồng bộ (async)
             response = await self.model.generate_content_async(prompt)
+            
+            # Kiểm tra xem Gemini có thực sự trả về chữ không
+            if not response or not response.text:
+                print(f"⚠️ Gemini trả về rỗng! Toàn bộ Object phản hồi: {response}")
+                raise ValueError("Gemini không trả về nội dung. Có thể do bị chặn nội dung (Safety).")
+                
             ai_response = response.text
+            print(f"🎉 AI phản hồi thành công! Độ dài: {len(ai_response)} ký tự.")
+            
         except Exception as e:
-            print(f"Lỗi khi gọi AI: {e}")
-            raise ValueError("Có lỗi xảy ra khi kết nối với AI. Vui lòng thử lại sau.")
-        # -------------------------------
+            print(f"❌ Lỗi nghiêm trọng khi gọi AI: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Có lỗi xảy ra khi kết nối với AI: {str(e)}"
+            )
 
         # 5. Lưu kết quả mới vào MongoDB
         await self.collection.update_one(

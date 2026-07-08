@@ -6,12 +6,16 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
+from app.ai.summarizer import AISummarizerService
 from app.core.config import settings
+from app.core.mongodb import mongo_client
 from app.core.mysql import SessionLocal
 from app.core.redis import redis_client
 from app.core.security import decode_token
 from app.schemas.user_schema import CurrentUser
 from app.services.auth_service import AuthService
+from app.services.document.crud import DocumentCRUDService
+from app.services.document.parser import DocumentParserService
 from app.services.presence_service import PresenceService
 from app.services.user_service import UserService
 
@@ -35,6 +39,11 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
         yield redis_client
     finally:
         pass
+
+async def get_mongodb():
+    if mongo_client.db is None:
+        raise ValueError("MongoDB chưa được khởi tạo! Vui lòng kiểm tra lại cấu hình lifespan trong main.py")
+    return mongo_client.db
 
 
 async def get_current_user(
@@ -84,12 +93,11 @@ class PermissionChecker:
         return current_user
 
 
-# Lấy các Bussiness logic từ AuthService (register, login, refresh, logout v.v.) để sử dụng trong các route
+# Lấy các Bussiness logic từ Services
 def get_presence_service(
-    db: Session = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ) -> PresenceService:
-    return PresenceService(db, redis)
+    return PresenceService(redis)
 
 
 def get_auth_service(
@@ -106,3 +114,15 @@ def get_user_service(
     presence: PresenceService = Depends(get_presence_service),
 ) -> UserService:
     return UserService(db, redis, presence)
+
+
+def get_document_crud_service(db: Session = Depends(get_db)) -> DocumentCRUDService:
+    return DocumentCRUDService(sql_db=db, mongo_db=mongo_client.db)
+
+
+async def get_document_parser_service(db = Depends(get_mongodb)) -> DocumentParserService:
+    return DocumentParserService(mongo_db=db)
+
+
+async def get_ai_summarizer_service(db = Depends(get_mongodb)) -> AISummarizerService:
+    return AISummarizerService(mongo_db=db) 
