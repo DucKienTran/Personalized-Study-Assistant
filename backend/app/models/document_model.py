@@ -4,7 +4,6 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     String,
-    Text,
 )
 from sqlalchemy.dialects.mysql import BIGINT
 from sqlalchemy.orm import relationship
@@ -24,9 +23,7 @@ class Document(Base):
     file_path = Column(String(500), nullable=False)
     file_type = Column(String(50), nullable=False)
 
-    # Dữ liệu thô
-    parsed_content = Column(Text, nullable=True)
-    summary_content = Column(Text, nullable=True)
+    mongo_id = Column(String(50), nullable=True)
 
     # metadata Chứa toàn bộ thông tin phân loại
     # {"purpose": "learning", "unlock_essay": true, "has_educational_images": true, "image_captions": [...]}

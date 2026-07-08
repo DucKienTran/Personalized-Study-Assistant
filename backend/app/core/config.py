@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Secret
-    OPENAI_API_KEY: str
+    GEMINI_API_KEY: str
     JWT_SECRET_KEY: str
     ADMIN_REGISTRATION_KEY: str
 
@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     # Cấu hình Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
+
+    # Cấu hình MongoDB
+    MONGODB_HOST: str = "localhost" 
+    MONGODB_PORT: int = 27017
+    MONGODB_NAME: str
+
+    @property
+    def MONGODB_URL(self) -> str:
+        return f"mongodb://{self.MONGODB_HOST}:{self.MONGODB_PORT}"
+
 
     # Token & Security Config
     JWT_ALGORITHM: str = "HS256"
