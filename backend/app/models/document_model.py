@@ -4,6 +4,7 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     String,
+    Text,
 )
 from sqlalchemy.dialects.mysql import BIGINT
 from sqlalchemy.orm import relationship
@@ -37,3 +38,28 @@ class Document(Base):
     # Quan hệ
     user = relationship("User", back_populates="documents")
     quizzes = relationship("Quiz", back_populates="document", cascade="all, delete-orphan")
+
+    summaries = relationship("DocumentSummary", back_populates="document", cascade="all, delete-orphan")
+
+class DocumentSummary(Base):
+    __tablename__ = "document_summaries"
+
+    id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
+    document_id = Column(
+        BIGINT(unsigned=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    title = Column(String(255), nullable=False)
+    
+    # Khóa ngoại dạng chuỗi trỏ sang ObjectId của MongoDB
+    mongo_summary_id = Column(String(50), nullable=False)
+    
+    # Lưu cấu hình lúc sinh bản tóm tắt
+    level = Column(String(50), nullable=False)       # short | normal | detailed
+    format = Column(String(50), nullable=False)      # paragraph | bullet | markdown
+    instruction = Column(Text, nullable=True)
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    # Quan hệ ngược lại với Document
+    document = relationship("Document", back_populates="summaries")

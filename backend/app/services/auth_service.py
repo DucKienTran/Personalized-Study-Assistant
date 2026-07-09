@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 import logging
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,13 @@ from app.core.security import (
     hash_password,
     is_refresh_token_blacklisted,
     verify_password,
+)
+from app.exceptions import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    InternalServerError,
+    UnauthorizedError,
 )
 from app.models.user_model import RefreshToken, Role, User
 from app.schemas.user_schema import UserLogin, UserRegister
@@ -68,26 +75,19 @@ class AuthService:
         existing_user = self.db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
             logger.warning(f"Đăng ký thất bại: Email {user_data.email} đã tồn tại")
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email này đã được đăng ký trên hệ thống.",
-            )
+            raise ConflictError("Email này đã được đăng ký trên hệ thống.")
 
         existing_username = self.db.query(User).filter(User.username == user_data.username).first()
 
         if existing_username:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Tên đăng nhập này đã tồn tại.",
-            )
+            raise BadRequestError("Tên đăng nhập này đã tồn tại.")
         db_role = self.db.query(Role).filter(Role.name == role_name).first()
         if not db_role:
             logger.error(
                 f"Hệ thống cấu hình thiếu: Không tìm thấy nhóm quyền '{role_name}' trong DB bảng roles"
             )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Cấu hình hệ thống lỗi: Nhóm quyền '{role_name}' không tồn tại.",
+            raise InternalServerError(
+                f"Cấu hình hệ thống lỗi: Nhóm quyền '{role_name}' không tồn tại."
             )
 
         new_user = User(
@@ -109,18 +109,15 @@ class AuthService:
     async def login(self, form_data: UserLogin, request: Request) -> dict:
         target_user = self.db.query(User).filter(User.email == form_data.email).first()
 
-        if not target_user or not verify_password(form_data.password, target_user.password_hash):
-            logger.warning(f"Đăng nhập thất bại: Email {form_data.email} sai thông tin")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email hoặc mật khẩu không chính xác.",
-            )
+        if not target_user:
+            logger.warning(f"Đăng nhập thất bại: Email {form_data.email} không tồn tại")
+            raise UnauthorizedError("Email hoặc mật khẩu không đúng.")  
+        if not verify_password(form_data.password, target_user.password_hash):
+            logger.warning(f"Đăng nhập thất bại: Email {form_data.email} nhập sai mật khẩu")
+            raise UnauthorizedError("Email hoặc mật khẩu không đúng.")
 
         if not target_user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Tài khoản đã bị vô hiệu hóa.",
-            )
+            raise ForbiddenError("Tài khoản đã bị vô hiệu hóa.")
         await self.redis.delete(f"user:revoked:{target_user.id}")
 
         tokens = generate_tokens_pair(
@@ -146,9 +143,8 @@ class AuthService:
 
     async def refresh(self, refresh_token: str, request: Request) -> dict:
         if not refresh_token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Phiên đăng nhập đã hết hạn hoặc không hợp lệ (Missing Cookie).",
+            raise UnauthorizedError(
+                "Phiên đăng nhập đã hết hạn hoặc không hợp lệ (Missing Cookie)."
             )
 
         if await is_refresh_token_blacklisted(self.redis, refresh_token):
@@ -159,33 +155,28 @@ class AuthService:
             except Exception as e:
                 logger.error(f"Lỗi khi xử lý trích xuất info để revoke user: {str(e)}")
 
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Phiên bảo mật bị rò rỉ hoặc hết hạn. Vui lòng đăng nhập lại để đảm bảo an toàn.",
+            raise UnauthorizedError(
+                "Phiên bảo mật bị rò rỉ hoặc hết hạn. Vui lòng đăng nhập lại để đảm bảo an toàn."
             )
 
         payload = decode_token(refresh_token, expected_type="refresh")
         db_token = self.db.query(RefreshToken).filter(RefreshToken.jti == payload["jti"]).first()
 
         if not db_token:
-            raise HTTPException(status_code=401, detail="Refresh token không tồn tại.")
+            raise UnauthorizedError("Refresh token không tồn tại.")
 
         if db_token.revoked:
-            raise HTTPException(status_code=401, detail="Refresh token đã bị thu hồi.")
+            raise UnauthorizedError("Refresh token đã bị thu hồi.")
         user_id = payload.get("id")
 
         if await self.redis.exists(f"user:revoked:{user_id}"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Phiên làm việc này đã bị hủy bỏ do nghi ngờ rò rỉ bảo mật. Vui lòng đăng nhập lại.",
+            raise UnauthorizedError(
+                "Phiên làm việc này đã bị hủy bỏ do nghi ngờ rò rỉ bảo mật. Vui lòng đăng nhập lại."
             )
 
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Tài khoản không tồn tại, đã bị xóa hoặc vô hiệu hóa.",
-            )
+            raise UnauthorizedError("Tài khoản không tồn tại, đã bị xóa hoặc vô hiệu hóa.")
 
         await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
         self._revoke_refresh_token(payload.get("jti"))

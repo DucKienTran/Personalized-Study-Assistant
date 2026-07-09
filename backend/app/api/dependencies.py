@@ -1,7 +1,7 @@
 import logging
 from typing import AsyncGenerator, Generator
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
@@ -12,10 +12,16 @@ from app.core.mongodb import mongo_client
 from app.core.mysql import SessionLocal
 from app.core.redis import redis_client
 from app.core.security import decode_token
+from app.exceptions import (
+    InternalServerError,
+    MissingUserIdentityError,
+    PermissionDeniedError,
+)
 from app.schemas.user_schema import CurrentUser
 from app.services.auth_service import AuthService
-from app.services.document.crud import DocumentCRUDService
+from app.services.document.document_service import DocumentService
 from app.services.document.parser import DocumentParserService
+from app.services.document.summary_service import DocumentSummaryService
 from app.services.presence_service import PresenceService
 from app.services.user_service import UserService
 
@@ -40,9 +46,12 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
     finally:
         pass
 
+
 async def get_mongodb():
     if mongo_client.db is None:
-        raise ValueError("MongoDB chưa được khởi tạo! Vui lòng kiểm tra lại cấu hình lifespan trong main.py")
+        raise InternalServerError(
+            "MongoDB chưa được khởi tạo! Vui lòng kiểm tra lại cấu hình lifespan trong main.py"
+        )
     return mongo_client.db
 
 
@@ -61,10 +70,7 @@ async def get_current_user(
     permissions = payload.get("permissions", [])
 
     if not user_id or not email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token không hợp lệ: Thiếu thông tin định danh người dùng",
-        )
+        raise MissingUserIdentityError()
 
     return CurrentUser(id=user_id, email=email, role=role_name, permissions=permissions)
 
@@ -85,10 +91,7 @@ class PermissionChecker:
         # Kiến tra xem quyền yêu cầu có nằm trong danh sách quyền của User không
         user_permissions = current_user.permissions or []
         if self.required_permission not in user_permissions:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Bạn không có quyền thực hiện hành động này. Yêu cầu quyền: '{self.required_permission}'",
-            )
+            raise PermissionDeniedError(self.required_permission)
 
         return current_user
 
@@ -116,13 +119,23 @@ def get_user_service(
     return UserService(db, redis, presence)
 
 
-def get_document_crud_service(db: Session = Depends(get_db)) -> DocumentCRUDService:
-    return DocumentCRUDService(sql_db=db, mongo_db=mongo_client.db)
 
-
-async def get_document_parser_service(db = Depends(get_mongodb)) -> DocumentParserService:
+async def get_document_parser_service(db=Depends(get_mongodb)) -> DocumentParserService:
     return DocumentParserService(mongo_db=db)
 
 
-async def get_ai_summarizer_service(db = Depends(get_mongodb)) -> AISummarizerService:
-    return AISummarizerService(mongo_db=db) 
+async def get_ai_summarizer_service(db=Depends(get_mongodb)) -> AISummarizerService:
+    return AISummarizerService(mongo_db=db)
+
+
+def get_document_service(
+    db: Session = Depends(get_db),
+    parser_service: DocumentParserService = Depends(
+        get_document_parser_service
+    ), 
+) -> DocumentService:
+    return DocumentService(sql_db=db, mongo_db=mongo_client.db, parser_service=parser_service)
+
+
+def get_document_summary_service(db: Session = Depends(get_db)) -> DocumentSummaryService:
+    return DocumentSummaryService(sql_db=db, mongo_db=mongo_client.db)

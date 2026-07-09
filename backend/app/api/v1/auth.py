@@ -8,6 +8,7 @@ from app.schemas.token_schema import TokenResponse
 from app.schemas.user_schema import UserLogin, UserRegister, UserResponse
 from app.services.auth_service import AuthService
 
+from app.exceptions import InvalidAdminRegistrationKeyError
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,7 @@ def register_admin(
         logger.warning(
             f"Đăng ký admin thất bại: Mã xác thực Admin không hợp lệ (email={user_data.email})"
         )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Mã xác thực Admin không hợp lệ."
-        )
+        raise InvalidAdminRegistrationKeyError()
     return service.register(user_data, role_name="admin")
 
 
