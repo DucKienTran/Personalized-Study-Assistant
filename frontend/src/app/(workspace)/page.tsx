@@ -47,7 +47,6 @@ const colorVariants = {
 export default function WorkspaceHomePage() {
     const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -61,10 +60,6 @@ export default function WorkspaceHomePage() {
             }
         };
         fetchUser();
-
-        const handleOpenModal = () => setIsUploadModalOpen(true);
-        window.addEventListener("open-upload-modal", handleOpenModal);
-        return () => window.removeEventListener("open-upload-modal", handleOpenModal);
     }, []);
 
     const displayName = user?.full_name || user?.email.split("@")[0] || "bạn";
@@ -79,7 +74,7 @@ export default function WorkspaceHomePage() {
                 <p className="text-gray-500 text-xs">Hôm nay bạn muốn xử lý công việc gì?</p>
             </div>
 
-            {/* Grid 4 ô tính năng cải tiến */}
+            {/* Grid 4 ô tính năng */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {WORKSPACE_FEATURES.map((feat, index) => {
                     // Lấy chuỗi class tương ứng từ object mapping ở trên
@@ -89,7 +84,6 @@ export default function WorkspaceHomePage() {
                         <Link
                             key={index}
                             href={feat.href}
-                            // Không dùng bg-white ở đây nữa nhé!
                             className={`group border rounded-2xl p-5 flex flex-col h-[200px] transition-all duration-300 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-1 overflow-hidden ${variantClass}`}
                         >
                             <div>
@@ -105,28 +99,6 @@ export default function WorkspaceHomePage() {
                     );
                 })}
             </div>
-
-            {/* Modal tải tài liệu */}
-            {isUploadModalOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-base font-bold text-gray-900">Tải tệp tài liệu mới lên</h2>
-                            <button onClick={() => setIsUploadModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
-                        </div>
-                        <div className="group border-2 border-dashed border-[#cbdcd0] hover:border-[#3b7a52] rounded-xl p-8 text-center flex flex-col items-center justify-center transition-colors cursor-pointer">
-                            <Icons.DocumentIcon className="w-12 h-12 mb-4 text-[#cbdcd0] group-hover:text-[#3b7a52] transition-colors" />
-                            <p className="font-medium text-sm text-gray-500 group-hover:text-[#2e5f3f] transition-colors">
-                                Kéo thả file vào đây
-                            </p>
-                        </div>
-                        <div className="mt-6 flex justify-end space-x-3">
-                            <button onClick={() => setIsUploadModalOpen(false)} className="px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Hủy bỏ</button>
-                            <button className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] text-white rounded-lg shadow-sm">Xác nhận</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -13,7 +13,7 @@ export const WORKSPACE_FEATURES: FeatureItem[] = [
         title: "Tóm tắt tài liệu",
         description: "Trích xuất nội dung cốt lõi, sơ đồ tư duy từ các file tài liệu dài nhanh chóng.",
         iconId: "summary",
-        href: "/documents",
+        href: "/summary",
         color: "blue"
     },
     {
