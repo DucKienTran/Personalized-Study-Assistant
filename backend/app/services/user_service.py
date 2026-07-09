@@ -3,7 +3,7 @@ import logging
 import time
 from typing import List, Optional, Union
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,12 @@ from app.core.security import (
     hash_password,
     is_refresh_token_blacklisted,
     verify_password,
+)
+from app.exceptions import (
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
 )
 from app.models.user_model import RefreshToken, User
 from app.schemas.user_schema import ChangePassword, CurrentUser
@@ -35,9 +41,7 @@ class UserService:
     def get_user_profile(self, current_user: CurrentUser) -> User:
         user = self.db.query(User).filter(User.id == current_user.id).first()
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại."
-            )
+            raise NotFoundError("Người dùng không tồn tại.")
         return user
 
     async def _revoke_all_user_tokens(self, user_id: int) -> None:
@@ -88,9 +92,8 @@ class UserService:
                 f"Truy cập trái phép: [{current_user.id}, {current_user.email}, {current_user.role}] "
                 f"cố gắng truy cập danh sách users"
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền truy cập vào danh sách người dùng (Yêu cầu quyền Admin).",
+            raise ForbiddenError(
+                "Bạn không có quyền truy cập vào danh sách người dùng (Yêu cầu quyền Admin)."
             )
 
         logger.info(
@@ -105,18 +108,15 @@ class UserService:
             logger.warning(
                 f"Cảnh báo bảo mật: User [{current_user.id}] cố gắng xem trạng thái người dùng."
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền xem trạng thái của người dùng (Yêu cầu quyền Admin).",
+            raise ForbiddenError(
+                "Bạn không có quyền xem trạng thái của người dùng (Yêu cầu quyền Admin)."
             )
 
         # Xem cho 1 người
         if target_id:
             target_user = self.db.query(User).filter(User.id == target_id).first()
             if not target_user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy người dùng này."
-                )
+                raise NotFoundError("Không tìm thấy người dùng này.")
             return await self._format_user_status(target_user)
 
         # Xem tất cả mọi người
@@ -163,35 +163,26 @@ class UserService:
     ) -> dict:
         db_user = self.db.query(User).filter(User.id == current_user.id).first()
         if not db_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại."
-            )
+            raise NotFoundError("Người dùng không tồn tại.")
         if not verify_password(data.old_password, db_user.password_hash):
             logger.warning(f"Đổi mật khẩu thất bại: [{current_user.id}] nhập sai mật khẩu cũ.")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu cũ không chính xác."
-            )
+            raise BadRequestError("Mật khẩu cũ không chính xác.")
 
         if verify_password(data.new_password, db_user.password_hash):
             logger.warning(
                 f"Đổi mật khẩu thất bại: [{current_user.id}] mật khẩu mới trùng mật khẩu cũ."
             )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Mật khẩu mới không được trùng với mật khẩu cũ.",
-            )
+            raise BadRequestError("Mật khẩu mới không được trùng với mật khẩu cũ.")
 
         if not refresh_token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Phiên đăng nhập đã hết hạn hoặc không hợp lệ (Missing Cookie).",
+            raise UnauthorizedError(
+                "Phiên đăng nhập đã hết hạn hoặc không hợp lệ (Missing Cookie)."
             )
 
         if await is_refresh_token_blacklisted(self.redis, refresh_token):
             logger.warning(f"Phát hiện hành vi tái sử dụng Refresh Token: {refresh_token}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Phiên làm việc của bạn đã hết hạn hoặc thay đổi. Vui lòng đăng nhập lại.",
+            raise UnauthorizedError(
+                "Phiên làm việc của bạn đã hết hạn hoặc thay đổi. Vui lòng đăng nhập lại."
             )
 
         payload = decode_token(refresh_token, expected_type="refresh")
@@ -199,10 +190,7 @@ class UserService:
             logger.error(
                 f"CẢNH BÁO: Bất đồng bộ định danh! Access [{current_user.id}] với Refresh [{payload.get('id')}]."
             )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Thông tin xác thực không đồng nhất.",
-            )
+            raise BadRequestError("Thông tin xác thực không đồng nhất.")
 
         db_user.password_hash = hash_password(data.new_password)
         self.db.commit()
@@ -246,13 +234,11 @@ class UserService:
             user_to_delete = self.db.query(User).filter(User.id == current_user.id).first()
         else:
             if current_user.role.name != "admin":
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền.")
+                raise ForbiddenError("Không có quyền.")
             user_to_delete = self.db.query(User).filter(User.id == target_id).first()
 
             if not user_to_delete:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tài khoản."
-                )
+                raise NotFoundError("Không tìm thấy tài khoản.")
 
         user_info = f"[{user_to_delete.id}, {user_to_delete.email}, {user_to_delete.role}]"
 

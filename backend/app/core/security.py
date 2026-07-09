@@ -3,12 +3,16 @@ import time
 from typing import List
 import uuid
 
-from fastapi import HTTPException, status
 import jwt
 from passlib.context import CryptContext
 from redis.asyncio import Redis
 
 from app.core.config import settings
+from app.exceptions import (
+    ExpiredTokenError,
+    InvalidTokenError,
+    InvalidTokenTypeError,
+)
 
 # PASSWORD HASHING
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -83,10 +87,7 @@ def decode_token(token: str, expected_type: str, raise_on_error: bool = True) ->
         token_type = payload.get("token_type")
         if token_type != expected_type:
             if raise_on_error:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Loại token không hợp lệ. Yêu cầu: {expected_type} token",
-                )
+                raise InvalidTokenTypeError(expected_type)
             return None
 
         return payload
@@ -94,11 +95,9 @@ def decode_token(token: str, expected_type: str, raise_on_error: bool = True) ->
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
         if raise_on_error:
             if isinstance(e, jwt.ExpiredSignatureError):
-                detail = "Token đã hết hạn sử dụng"
-            else:
-                detail = "Token không hợp lệ hoặc đã bị thay đổi"
+                raise ExpiredTokenError()
 
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+            raise InvalidTokenError()
 
         return None
 

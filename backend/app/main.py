@@ -16,6 +16,7 @@ from app.core.logger import setup_logging
 from app.core.mongodb import mongo_client
 from app.core.mysql import Base, engine
 from app.core.redis import redis_client
+from app.exceptions import AppError, app_exception_handler
 import app.models
 
 setup_logging()
@@ -87,7 +88,10 @@ app.add_middleware(
 )
 
 
-# EXCEPTION HANDLER
+# EXCEPTION HANDLERS
+app.add_exception_handler(AppError, app_exception_handler)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"CRASH HỆ THỐNG: Lỗi tại {request.method} {request.url.path}")

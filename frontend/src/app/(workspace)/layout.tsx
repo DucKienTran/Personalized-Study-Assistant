@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import UploadModal from "@/components/shared/UploadModal";
+import { DocumentListItem } from "@/services/document.service";
 import { useRouter, usePathname } from "next/navigation";
 import { userService, UserProfile } from "@/services/user.service";
 import { UserIcon, KeyIcon, LogoutIcon } from "@/components/shared/icons";
 import { authService } from "@/services/auth.service";
 
-// --- BỘ ICON SIDEBAR CHUẨN VECTOR LINE ---
 const HomeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -43,6 +44,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const profileRef = useRef<HTMLDivElement>(null); // Dùng để bắt sự kiện click out đóng menu
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -61,10 +64,19 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        const handleOpenModal = () => setIsUploadModalOpen(true);
+        window.addEventListener("open-upload-modal", handleOpenModal);
+        return () => window.removeEventListener("open-upload-modal", handleOpenModal);
+    }, []);
+
     const handleMouseEnter = () => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 300); };
     const handleMouseLeave = () => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setIsHovered(false); };
     const handleLogout = async () => { await authService.logout(); router.push("/login"); };
-
+    const handleUploaded = (doc: DocumentListItem) => {
+    setIsUploadModalOpen(false);
+    router.push(`/documents/${doc.id}/summary`); // upload xong → thẳng vào tóm tắt luôn
+};
     const menus = [
         { name: "Trang chủ", href: "/", icon: <HomeIcon /> },
         { name: "Thư viện của tôi", href: "/documents", icon: <LibraryIcon /> },
@@ -191,6 +203,12 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
                 <main className="flex-1 overflow-y-auto p-8 pt-20 bg-gray-50">{children}</main>
             </div>
+            {/* Modal Upload tài liệu */}
+            <UploadModal
+                isOpen={isUploadModalOpen}
+                onClose={() => setIsUploadModalOpen(false)}
+                onUploaded={handleUploaded}
+            />
         </div>
     );
 }

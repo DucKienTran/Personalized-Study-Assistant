@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from app.exceptions import ForbiddenError
 import pytest
 
 from app.schemas.user_schema import CurrentUser
@@ -22,7 +22,7 @@ def test_get_all_users_rejects_non_admin():
     service = UserService(DummyDB(), DummyRedis(), DummyPresence())
     current_user = CurrentUser(id=1, email="user@example.com", role="client", permissions=[])
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ForbiddenError) as exc_info:
         service.get_all_users(current_user)
 
     assert exc_info.value.status_code == 403

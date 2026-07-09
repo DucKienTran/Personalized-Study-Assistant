@@ -13,6 +13,16 @@ from pydantic import (
 from typing_extensions import Self
 
 
+def validate_strong_password_logic(value: str) -> str:
+    if not re.search(r"[A-Z]", value):
+        raise ValueError("Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa.")
+    if not re.search(r"[a-z]", value) or not re.search(r"[0-9]", value):
+        raise ValueError("Mật khẩu phải chứa cả ký tự chữ thường và chữ số.")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
+        raise ValueError("Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).")
+    return value
+
+
 class UserRegister(BaseModel):
     email: EmailStr
     username: str = Field(
@@ -24,9 +34,8 @@ class UserRegister(BaseModel):
     )
     password: str = Field(..., min_length=8, description="Mật khẩu phải có ít nhất 8 ký tự.")
     confirm_password: str = Field(
-        ..., min_length=8, description="Mật khẩu mới phải có ít nhất 8 ký tự."
+        ..., min_length=8, description="Mật khẩu nhập lại phải có ít nhất 8 ký tự."
     )
-
     full_name: Optional[str] = None
 
     @model_validator(mode="after")
@@ -37,17 +46,8 @@ class UserRegister(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_strong_password(cls, value: str) -> str:
-        if not re.search(r"[A-Z]", value):
-            raise ValueError("Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa.")
-
-        if not re.search(r"[a-z]", value) or not re.search(r"[0-9]", value):
-            raise ValueError("Mật khẩu phải chứa cả ký tự chữ thường và chữ số.")
-
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
-            raise ValueError("Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).")
-
-        return value
+    def validate_password(cls, value: str) -> str:
+        return validate_strong_password_logic(value)
 
 
 class ChangePassword(BaseModel):
@@ -67,17 +67,8 @@ class ChangePassword(BaseModel):
 
     @field_validator("new_password")
     @classmethod
-    def validate_strong_new_password(cls, value: str) -> str:
-        if not re.search(r"[A-Z]", value):
-            raise ValueError("Mật khẩu mới phải chứa ít nhất 1 chữ cái viết hoa.")
-
-        if not re.search(r"[a-z]", value) or not re.search(r"[0-9]", value):
-            raise ValueError("Mật khẩu mới phải chứa cả ký tự chữ thường và chữ số.")
-
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
-            raise ValueError("Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).")
-
-        return value
+    def validate_new_password(cls, value: str) -> str:
+        return validate_strong_password_logic(value)
 
 
 class UserStatus(BaseModel):
