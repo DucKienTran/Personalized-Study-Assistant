@@ -1,12 +1,19 @@
 from datetime import datetime, timedelta, timezone
 import time
+from typing import List
+import uuid
 
-from fastapi import HTTPException, status
 import jwt
+from fastapi import Response
 from passlib.context import CryptContext
 from redis.asyncio import Redis
 
 from app.core.config import settings
+from app.exceptions import (
+    ExpiredTokenError,
+    InvalidTokenError,
+    InvalidTokenTypeError,
+)
 
 # PASSWORD HASHING
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -28,6 +35,10 @@ REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
 
 
 def create_access_token(data: dict) -> str:
+    """
+    Tạo Access Token.
+    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
+    """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "token_type": "access"})
@@ -35,10 +46,41 @@ def create_access_token(data: dict) -> str:
 
 
 def create_refresh_token(data: dict) -> str:
+    """
+    Tạo Refresh Token.
+    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
+    """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=REFRESH_TOKEN_EXPIRE_MINUTES
+    )
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def generate_tokens_pair(
+    user_id: int, email: str, role_name: str, permissions: List[str]
+) -> dict:
+    """
+    Hàm tạo cả cặp token Access & Refresh
+    """
+    token_jti = str(uuid.uuid4())
+
+    access_payload = {
+        "id": user_id,
+        "sub": email,
+        "role": role_name,
+        "permissions": permissions,
+        "jti": token_jti,
+    }
+    refresh_payload = {"id": user_id, "sub": email, "jti": token_jti}
+
+    return {
+        "access_token": create_access_token(access_payload),
+        "refresh_token": create_refresh_token(refresh_payload),
+        "token_type": "bearer",
+        "jti": token_jti,
+    }
 
 
 def decode_token(token: str, expected_type: str, raise_on_error: bool = True) -> dict:
@@ -50,10 +92,7 @@ def decode_token(token: str, expected_type: str, raise_on_error: bool = True) ->
         token_type = payload.get("token_type")
         if token_type != expected_type:
             if raise_on_error:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Loại token không hợp lệ. Yêu cầu: {expected_type} token",
-                )
+                raise InvalidTokenTypeError(expected_type)
             return None
 
         return payload
@@ -61,11 +100,9 @@ def decode_token(token: str, expected_type: str, raise_on_error: bool = True) ->
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
         if raise_on_error:
             if isinstance(e, jwt.ExpiredSignatureError):
-                detail = "Token đã hết hạn sử dụng"
-            else:
-                detail = "Token không hợp lệ hoặc đã bị thay đổi"
+                raise ExpiredTokenError()
 
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+            raise InvalidTokenError()
 
         return None
 
@@ -81,3 +118,14 @@ async def blacklist_refresh_token(redis: Redis, token: str, exp: float) -> None:
 async def is_refresh_token_blacklisted(redis: Redis, token: str) -> bool:
     """Kiểm tra refresh token đã bị blacklist hay chưa."""
     return bool(await redis.get(f"blacklist:refresh:{token}"))
+
+
+def set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+    )

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # ─── FASTAPI BACKEND SERVICE ────────────────────────────────────────
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: learning_aid_backend
@@ -11,14 +11,20 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app 
+      - ./backend:/app
     env_file:
       - ./backend/.env.dev
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+      MONGODB_HOST: mongodb
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongodb:
+        condition: service_started
     # command: >
     #   bash -c "
     #   echo \"[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] [Infra] Đang chờ MySQL (Cổng 3306) sẵn sàng...\";
@@ -32,7 +38,7 @@ services:
     networks:
       - learning_aid_network
 
- # ─── NEXTJS FRONTEND SERVICE ────────────────────────────────────────
+  # ─── NEXTJS FRONTEND SERVICE ────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -42,7 +48,7 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-      - /app/node_modules 
+      - /app/node_modules
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -53,7 +59,7 @@ services:
     networks:
       - learning_aid_network
 
-# ─── MYSQL DATABASE SERVICE ─────────────────────────────────────────
+  # ─── MYSQL DATABASE SERVICE ─────────────────────────────────────────
   db:
     image: mysql:8.0
     container_name: learning_aid_mysql
@@ -62,14 +68,14 @@ services:
       - "3306:3306"
     env_file:
       - ./backend/.env.dev
-    environment:  
-      MYSQL_ROOT_PASSWORD: "mysql123456"      
+    environment:
+      MYSQL_ROOT_PASSWORD: "mysql123456"
       MYSQL_DATABASE: "learning_aid_db"
       MYSQL_ROOT_HOST: "%"
     volumes:
       - learning_aid_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -77,7 +83,7 @@ services:
     networks:
       - learning_aid_network
 
-# ─── REDIS CACHE SERVICE ────────────────────────────────────────────
+  # ─── REDIS CACHE SERVICE ────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: learning_aid_redis
@@ -87,10 +93,27 @@ services:
     volumes:
       - learning_aid_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - learning_aid_network
+
+  # ─── MONGODB SERVICE ────────────────────────────────────────────
+  mongodb:
+    image: mongo:6.0
+    container_name: learning_aid_mongodb
+    command:
+      - mongod
+      - --quiet
+      - --logpath
+      - /dev/null
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - learning_aid_mongodb_data:/data/db
     networks:
       - learning_aid_network
 
@@ -102,3 +125,4 @@ networks:
 volumes:
   learning_aid_mysql_data:
   learning_aid_redis_data:
+  learning_aid_mongodb_data:

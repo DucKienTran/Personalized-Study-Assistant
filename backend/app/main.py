@@ -8,12 +8,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import configure_mappers
 from sqlalchemy.sql import text
 
-from app.api.v1.auth import router as auth_router
-from app.api.v1.users import router as users_router
+from app.api.auth import router as auth_router
+from app.api.documents import router as documents_router
+from app.api.users import router as users_router
 from app.core.config import settings
-from app.core.logger import setup_logging
-from app.core.mysql import Base, engine
-from app.core.redis import redis_client
+from app.core.database import Base, engine, mongo_client, redis_client
+from app.core.logging import setup_logging
+from app.exceptions import AppError, app_exception_handler
 import app.models
 
 setup_logging()
@@ -45,10 +46,19 @@ async def lifespan(app: FastAPI):
         logger.critical(f"LỖI KẾT NỐI REDIS: {str(e)}")
         raise e
 
+    # Khởi tạo MongoDB Database
+    try:
+        mongo_client.init_db()
+        logger.info("Kết nối MongoDB thành công.")
+    except Exception as e:
+        logger.critical(f"LỖI KẾT NỐI DATABASE MONGODB: {str(e)}")
+        raise e
+
     yield
 
     logger.info("Đang dọn dẹp tài nguyên trước khi tắt server...")
     await redis_client.aclose()
+    await mongo_client.close_db()
     engine.dispose()
     logger.info("Server đã tắt an toàn.")
 
@@ -57,12 +67,14 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Core API backend cho Study Assistant",
     version="1.0.0",
-    lifespan=lifespan,  # Inject lifespan vào app
+    lifespan=lifespan,
 )
 
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(
@@ -74,7 +86,9 @@ app.add_middleware(
 )
 
 
-# EXCEPTION HANDLER
+app.add_exception_handler(AppError, app_exception_handler)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"CRASH HỆ THỐNG: Lỗi tại {request.method} {request.url.path}")
@@ -91,6 +105,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
+app.include_router(documents_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

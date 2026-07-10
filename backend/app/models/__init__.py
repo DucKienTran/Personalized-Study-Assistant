@@ -1,4 +1,4 @@
-from app.core.mysql import Base
+from app.core.database import Base
 from app.models.document_model import Document
 from app.models.quiz_model import Quiz, QuizQuestion, QuizResult
 from app.models.user_model import User
