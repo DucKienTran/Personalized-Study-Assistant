@@ -32,7 +32,9 @@ class UserRegister(BaseModel):
         pattern=r"^[a-zA-Z0-9_]+$",
         description="Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới",
     )
-    password: str = Field(..., min_length=8, description="Mật khẩu phải có ít nhất 8 ký tự.")
+    password: str = Field(
+        ..., min_length=8, description="Mật khẩu phải có ít nhất 8 ký tự."
+    )
     confirm_password: str = Field(
         ..., min_length=8, description="Mật khẩu nhập lại phải có ít nhất 8 ký tự."
     )

@@ -1,16 +1,15 @@
+from collections.abc import AsyncGenerator, Generator
 import logging
-from typing import AsyncGenerator, Generator
+from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from app.ai.summarizer import AISummarizerService
-from app.core.config import settings
-from app.core.mongodb import mongo_client
-from app.core.mysql import SessionLocal
-from app.core.redis import redis_client
+from app.core.database import SessionLocal, mongo_client, redis_client
 from app.core.security import decode_token
 from app.exceptions import (
     InternalServerError,
@@ -27,9 +26,6 @@ from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
-
-REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
-ONLINE_STATUS_EXPIRE_SECONDS = settings.ONLINE_STATUS_EXPIRE_SECONDS
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -56,7 +52,7 @@ async def get_mongodb():
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> CurrentUser:
     """
     Dependency lấy thông tin người dùng từ Access Token theo cơ chế STATELESS.
@@ -83,12 +79,13 @@ class PermissionChecker:
     def __init__(self, required_permission: str):
         self.required_permission = required_permission
 
-    def __call__(self, current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        # Nếu là admin, tự động cho qua tất cả các quyền
+    def __call__(
+        self,
+        current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    ) -> CurrentUser:
         if current_user.role == "admin":
             return current_user
 
-        # Kiến tra xem quyền yêu cầu có nằm trong danh sách quyền của User không
         user_permissions = current_user.permissions or []
         if self.required_permission not in user_permissions:
             raise PermissionDeniedError(self.required_permission)
@@ -96,46 +93,70 @@ class PermissionChecker:
         return current_user
 
 
-# Lấy các Bussiness logic từ Services
 def get_presence_service(
-    redis: Redis = Depends(get_redis),
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> PresenceService:
     return PresenceService(redis)
 
 
 def get_auth_service(
-    db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    presence: PresenceService = Depends(get_presence_service),
+    db: Annotated[Session, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    presence: Annotated[PresenceService, Depends(get_presence_service)],
 ) -> AuthService:
     return AuthService(db, redis, presence)
 
 
 def get_user_service(
-    db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    presence: PresenceService = Depends(get_presence_service),
+    db: Annotated[Session, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    presence: Annotated[PresenceService, Depends(get_presence_service)],
 ) -> UserService:
     return UserService(db, redis, presence)
 
 
-
-async def get_document_parser_service(db=Depends(get_mongodb)) -> DocumentParserService:
+async def get_document_parser_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_mongodb)],
+) -> DocumentParserService:
     return DocumentParserService(mongo_db=db)
 
 
-async def get_ai_summarizer_service(db=Depends(get_mongodb)) -> AISummarizerService:
+async def get_ai_summarizer_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_mongodb)],
+) -> AISummarizerService:
     return AISummarizerService(mongo_db=db)
 
 
 def get_document_service(
-    db: Session = Depends(get_db),
-    parser_service: DocumentParserService = Depends(
-        get_document_parser_service
-    ), 
+    db: Annotated[Session, Depends(get_db)],
+    parser_service: Annotated[
+        DocumentParserService, Depends(get_document_parser_service)
+    ],
 ) -> DocumentService:
-    return DocumentService(sql_db=db, mongo_db=mongo_client.db, parser_service=parser_service)
+    return DocumentService(
+        sql_db=db, mongo_db=mongo_client.db, parser_service=parser_service
+    )
 
 
-def get_document_summary_service(db: Session = Depends(get_db)) -> DocumentSummaryService:
+def get_document_summary_service(
+    db: Annotated[Session, Depends(get_db)],
+) -> DocumentSummaryService:
     return DocumentSummaryService(sql_db=db, mongo_db=mongo_client.db)
+
+
+DbSession = Annotated[Session, Depends(get_db)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
+CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
+PresenceServiceDep = Annotated[PresenceService, Depends(get_presence_service)]
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+DocumentParserServiceDep = Annotated[
+    DocumentParserService, Depends(get_document_parser_service)
+]
+AISummarizerServiceDep = Annotated[
+    AISummarizerService, Depends(get_ai_summarizer_service)
+]
+DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
+DocumentSummaryServiceDep = Annotated[
+    DocumentSummaryService, Depends(get_document_summary_service)
+]

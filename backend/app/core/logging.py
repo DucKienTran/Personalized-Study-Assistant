@@ -13,7 +13,9 @@ def setup_logging():
         "CRITICAL": "red,bg_white",
     }
 
-    terminal_format = "%(log_color)s%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    terminal_format = (
+        "%(log_color)s%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    )
     file_format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 
     color_formatter = colorlog.ColoredFormatter(
@@ -23,7 +25,6 @@ def setup_logging():
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(color_formatter)
 
-    # Lưu log vào file app.log
     file_handler = logging.FileHandler("app.log", encoding="utf-8")
     file_handler.setFormatter(logging.Formatter(file_format))
 
@@ -34,7 +35,6 @@ def setup_logging():
     root_logger.addHandler(stream_handler)
     root_logger.addHandler(file_handler)
 
-    # Giảm bớt các log rác từ uvicorn
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
     logging.getLogger("watchfiles").setLevel(logging.WARNING)

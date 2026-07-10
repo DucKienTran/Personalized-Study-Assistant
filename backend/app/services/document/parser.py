@@ -58,7 +58,9 @@ class DocumentParserService:
             }
 
             result = await self.collection.insert_one(document_data)
-            logger.info(f"[Parser] Đã lưu thành công vào MongoDB. ID: {result.inserted_id}")
+            logger.info(
+                f"[Parser] Đã lưu thành công vào MongoDB. ID: {result.inserted_id}"
+            )
 
             return {
                 "document_id": str(result.inserted_id),

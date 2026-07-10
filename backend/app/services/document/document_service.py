@@ -8,14 +8,19 @@ from app.services.document.parser import DocumentParserService
 
 
 class DocumentService:
-    def __init__(self, sql_db: Session, mongo_db, parser_service: DocumentParserService):
+    def __init__(
+        self, sql_db: Session, mongo_db, parser_service: DocumentParserService
+    ):
         self.sql_db = sql_db
         self.mongo_collection = mongo_db["parsed_documents"]
         self.parser_service = parser_service
 
     def _get_unique_title(self, user_id: int, base_title: str) -> str:
         existing_titles = {
-            row[0] for row in self.sql_db.query(Document.title).filter(Document.user_id == user_id).all()
+            row[0]
+            for row in self.sql_db.query(Document.title)
+            .filter(Document.user_id == user_id)
+            .all()
         }
         if base_title not in existing_titles:
             return base_title
@@ -23,15 +28,19 @@ class DocumentService:
         while f"{base_title} ({i})" in existing_titles:
             i += 1
         return f"{base_title} ({i})"
-    
-    async def upload_and_process_document(self, file_bytes: bytes, filename: str, user_id: int):
+
+    async def upload_and_process_document(
+        self, file_bytes: bytes, filename: str, user_id: int
+    ):
         if not filename.lower().endswith(".pdf"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Hệ thống chỉ hỗ trợ xử lý tài liệu định dạng PDF.",
             )
 
-        total_pages, extracted_text = self.parser_service._extract_text_sync(file_bytes, filename)
+        total_pages, extracted_text = self.parser_service._extract_text_sync(
+            file_bytes, filename
+        )
         final_title = self._get_unique_title(user_id, filename)
 
         mongo_data = {
@@ -73,7 +82,9 @@ class DocumentService:
             return query.filter(Document.id == document_id).first()
         if status_filter:
             query = query.filter(Document.status == status_filter)
-        return query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
+        return (
+            query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
+        )
 
     async def delete_document(self, document_id: int, user_id: int) -> bool:
         doc = (
@@ -86,5 +97,3 @@ class DocumentService:
         self.sql_db.delete(doc)
         self.sql_db.commit()
         return True
-
-    

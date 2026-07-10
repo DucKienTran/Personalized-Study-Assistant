@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 import pytest
 
-from app.api.dependencies import PermissionChecker
+from app.core.dependencies import PermissionChecker
 from app.schemas.user_schema import CurrentUser
 
 

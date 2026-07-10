@@ -11,7 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.mysql import BIGINT
 from sqlalchemy.orm import relationship
 
-from app.core.mysql import Base
+from app.core.database import Base
 
 
 class Quiz(Base):
@@ -19,10 +19,14 @@ class Quiz(Base):
 
     id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
     document_id = Column(
-        BIGINT(unsigned=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+        BIGINT(unsigned=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
     )
     user_id = Column(
-        BIGINT(unsigned=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        BIGINT(unsigned=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
     )
     title = Column(String(255), nullable=False)
 
@@ -33,8 +37,12 @@ class Quiz(Base):
     # Relationships
     document = relationship("Document", back_populates="quizzes")
     user = relationship("User")
-    questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
-    results = relationship("QuizResult", back_populates="quiz", cascade="all, delete-orphan")
+    questions = relationship(
+        "QuizQuestion", back_populates="quiz", cascade="all, delete-orphan"
+    )
+    results = relationship(
+        "QuizResult", back_populates="quiz", cascade="all, delete-orphan"
+    )
 
 
 class QuizQuestion(Base):
@@ -42,7 +50,9 @@ class QuizQuestion(Base):
 
     id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
     quiz_id = Column(
-        BIGINT(unsigned=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False
+        BIGINT(unsigned=True),
+        ForeignKey("quizzes.id", ondelete="CASCADE"),
+        nullable=False,
     )
 
     question_text = Column(Text, nullable=False)
@@ -62,10 +72,14 @@ class QuizResult(Base):
 
     id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
     quiz_id = Column(
-        BIGINT(unsigned=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False
+        BIGINT(unsigned=True),
+        ForeignKey("quizzes.id", ondelete="CASCADE"),
+        nullable=False,
     )
     user_id = Column(
-        BIGINT(unsigned=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        BIGINT(unsigned=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
     )
 
     score = Column(Float, nullable=True)

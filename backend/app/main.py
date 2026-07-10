@@ -8,14 +8,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import configure_mappers
 from sqlalchemy.sql import text
 
-from app.api.v1.auth import router as auth_router
-from app.api.v1.documents import router as documents_router
-from app.api.v1.users import router as users_router
+from app.api.auth import router as auth_router
+from app.api.documents import router as documents_router
+from app.api.users import router as users_router
 from app.core.config import settings
-from app.core.logger import setup_logging
-from app.core.mongodb import mongo_client
-from app.core.mysql import Base, engine
-from app.core.redis import redis_client
+from app.core.database import Base, engine, mongo_client, redis_client
+from app.core.logging import setup_logging
 from app.exceptions import AppError, app_exception_handler
 import app.models
 
@@ -48,7 +46,7 @@ async def lifespan(app: FastAPI):
         logger.critical(f"LỖI KẾT NỐI REDIS: {str(e)}")
         raise e
 
-    # Khởi tạo MongoDB Database (THÊM ĐOẠN NÀY)
+    # Khởi tạo MongoDB Database
     try:
         mongo_client.init_db()
         logger.info("Kết nối MongoDB thành công.")
@@ -60,7 +58,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Đang dọn dẹp tài nguyên trước khi tắt server...")
     await redis_client.aclose()
-    await mongo_client.close_db()  # THÊM DÒNG NÀY
+    await mongo_client.close_db()
     engine.dispose()
     logger.info("Server đã tắt an toàn.")
 
@@ -88,7 +86,6 @@ app.add_middleware(
 )
 
 
-# EXCEPTION HANDLERS
 app.add_exception_handler(AppError, app_exception_handler)
 
 

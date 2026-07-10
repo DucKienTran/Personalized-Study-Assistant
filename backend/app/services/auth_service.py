@@ -72,12 +72,16 @@ class AuthService:
             self.db.commit()
 
     def register(self, user_data: UserRegister, role_name: str = "client") -> User:
-        existing_user = self.db.query(User).filter(User.email == user_data.email).first()
+        existing_user = (
+            self.db.query(User).filter(User.email == user_data.email).first()
+        )
         if existing_user:
             logger.warning(f"Đăng ký thất bại: Email {user_data.email} đã tồn tại")
             raise ConflictError("Email này đã được đăng ký trên hệ thống.")
 
-        existing_username = self.db.query(User).filter(User.username == user_data.username).first()
+        existing_username = (
+            self.db.query(User).filter(User.username == user_data.username).first()
+        )
 
         if existing_username:
             raise BadRequestError("Tên đăng nhập này đã tồn tại.")
@@ -111,9 +115,11 @@ class AuthService:
 
         if not target_user:
             logger.warning(f"Đăng nhập thất bại: Email {form_data.email} không tồn tại")
-            raise UnauthorizedError("Email hoặc mật khẩu không đúng.")  
+            raise UnauthorizedError("Email hoặc mật khẩu không đúng.")
         if not verify_password(form_data.password, target_user.password_hash):
-            logger.warning(f"Đăng nhập thất bại: Email {form_data.email} nhập sai mật khẩu")
+            logger.warning(
+                f"Đăng nhập thất bại: Email {form_data.email} nhập sai mật khẩu"
+            )
             raise UnauthorizedError("Email hoặc mật khẩu không đúng.")
 
         if not target_user.is_active:
@@ -149,7 +155,9 @@ class AuthService:
 
         if await is_refresh_token_blacklisted(self.redis, refresh_token):
             try:
-                payload = decode_token(refresh_token, expected_type="refresh", raise_on_error=False)
+                payload = decode_token(
+                    refresh_token, expected_type="refresh", raise_on_error=False
+                )
                 if payload and payload.get("id"):
                     await self._revoke_all_user_tokens(payload.get("id"))
             except Exception as e:
@@ -160,7 +168,11 @@ class AuthService:
             )
 
         payload = decode_token(refresh_token, expected_type="refresh")
-        db_token = self.db.query(RefreshToken).filter(RefreshToken.jti == payload["jti"]).first()
+        db_token = (
+            self.db.query(RefreshToken)
+            .filter(RefreshToken.jti == payload["jti"])
+            .first()
+        )
 
         if not db_token:
             raise UnauthorizedError("Refresh token không tồn tại.")
@@ -176,7 +188,9 @@ class AuthService:
 
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user or not user.is_active:
-            raise UnauthorizedError("Tài khoản không tồn tại, đã bị xóa hoặc vô hiệu hóa.")
+            raise UnauthorizedError(
+                "Tài khoản không tồn tại, đã bị xóa hoặc vô hiệu hóa."
+            )
 
         await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
         self._revoke_refresh_token(payload.get("jti"))
@@ -202,9 +216,13 @@ class AuthService:
 
     async def logout(self, refresh_token: str) -> dict:
         if refresh_token:
-            payload = decode_token(refresh_token, expected_type="refresh", raise_on_error=False)
+            payload = decode_token(
+                refresh_token, expected_type="refresh", raise_on_error=False
+            )
             if payload:
-                await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
+                await blacklist_refresh_token(
+                    self.redis, refresh_token, payload.get("exp")
+                )
                 user_id = payload.get("id")
                 await self.presence.clear_online_status(user_id)
                 self._revoke_refresh_token(payload.get("jti"))

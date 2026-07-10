@@ -4,7 +4,9 @@ import re
 from fastapi import HTTPException, UploadFile
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "uploads"))
+UPLOAD_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "../../..", "uploads")
+)
 
 
 def validate_and_save_file(file: UploadFile) -> str:
@@ -34,7 +36,9 @@ def validate_and_save_file(file: UploadFile) -> str:
         with open(file_path, "wb") as buffer:
             buffer.write(file.file.read())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Không thể lưu file lên server: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Không thể lưu file lên server: {str(e)}"
+        )
 
     return file_path
 

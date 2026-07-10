@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+
 class DocumentOut(BaseModel):
     id: int
     title: str

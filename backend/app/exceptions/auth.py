@@ -1,4 +1,4 @@
-from app.exceptions.base import UnauthorizedError, ForbiddenError
+from app.exceptions.base import ForbiddenError, UnauthorizedError
 
 
 class InvalidTokenError(UnauthorizedError):
@@ -19,18 +19,14 @@ class InvalidTokenTypeError(UnauthorizedError):
     error_code = "invalid_token_type"
 
     def __init__(self, expected_type: str):
-        super().__init__(
-            f"Loại token không hợp lệ. Yêu cầu: {expected_type} token"
-        )
+        super().__init__(f"Loại token không hợp lệ. Yêu cầu: {expected_type} token")
 
 
 class MissingUserIdentityError(UnauthorizedError):
     error_code = "missing_user_identity"
 
     def __init__(self):
-        super().__init__(
-            "Token không hợp lệ: Thiếu thông tin định danh người dùng."
-        )
+        super().__init__("Token không hợp lệ: Thiếu thông tin định danh người dùng.")
 
 
 class PermissionDeniedError(ForbiddenError):
