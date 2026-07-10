@@ -4,6 +4,7 @@ from typing import List
 import uuid
 
 import jwt
+from fastapi import Response
 from passlib.context import CryptContext
 from redis.asyncio import Redis
 
@@ -50,12 +51,16 @@ def create_refresh_token(data: dict) -> str:
     Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=REFRESH_TOKEN_EXPIRE_MINUTES
+    )
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def generate_tokens_pair(user_id: int, email: str, role_name: str, permissions: List[str]) -> dict:
+def generate_tokens_pair(
+    user_id: int, email: str, role_name: str, permissions: List[str]
+) -> dict:
     """
     Hàm tạo cả cặp token Access & Refresh
     """
@@ -113,3 +118,14 @@ async def blacklist_refresh_token(redis: Redis, token: str, exp: float) -> None:
 async def is_refresh_token_blacklisted(redis: Redis, token: str) -> bool:
     """Kiểm tra refresh token đã bị blacklist hay chưa."""
     return bool(await redis.get(f"blacklist:refresh:{token}"))
+
+
+def set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+    )

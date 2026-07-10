@@ -20,7 +20,9 @@ class DummyPresence:
 
 def test_get_all_users_rejects_non_admin():
     service = UserService(DummyDB(), DummyRedis(), DummyPresence())
-    current_user = CurrentUser(id=1, email="user@example.com", role="client", permissions=[])
+    current_user = CurrentUser(
+        id=1, email="user@example.com", role="client", permissions=[]
+    )
 
     with pytest.raises(ForbiddenError) as exc_info:
         service.get_all_users(current_user)

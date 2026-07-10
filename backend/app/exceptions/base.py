@@ -37,5 +37,7 @@ class InternalServerError(AppError):
     status_code = 500
     error_code = "internal_server_error"
 
-    def __init__(self, message: str = "Đã xảy ra lỗi hệ thống.", *, details: dict | None = None):
+    def __init__(
+        self, message: str = "Đã xảy ra lỗi hệ thống.", *, details: dict | None = None
+    ):
         super().__init__(message, details=details)

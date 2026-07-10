@@ -1,8 +1,9 @@
 from typing import Optional
 
 from pydantic import BaseModel
-from datetime import datetime 
-from pydantic import ConfigDict 
+from datetime import datetime
+from pydantic import ConfigDict
+
 
 class SaveSummaryRequest(BaseModel):
     document_id: int
@@ -15,6 +16,7 @@ class SaveSummaryRequest(BaseModel):
 
 class OverwriteSummaryRequest(BaseModel):
     summary_text: str
+
 
 # Schema dùng để trả dữ liệu cho danh sách lịch sử
 class SummaryOut(BaseModel):

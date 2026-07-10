@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.mysql import SessionLocal
+from app.core.database import SessionLocal
 from app.models.user_model import Permission, Role
 
 ROLES = [
@@ -61,7 +61,11 @@ def seed_permissions(db: Session):
     print("Seeding permissions...")
 
     for permission_data in PERMISSIONS:
-        permission = db.query(Permission).filter(Permission.code == permission_data["code"]).first()
+        permission = (
+            db.query(Permission)
+            .filter(Permission.code == permission_data["code"])
+            .first()
+        )
 
         if permission is None:
             db.add(Permission(**permission_data))
@@ -92,7 +96,10 @@ def seed_role_permissions(db: Session):
     }
 
     for permission in permissions:
-        if permission.code in client_permission_codes and permission not in client.permissions:
+        if (
+            permission.code in client_permission_codes
+            and permission not in client.permissions
+        ):
             client.permissions.append(permission)
 
     db.commit()

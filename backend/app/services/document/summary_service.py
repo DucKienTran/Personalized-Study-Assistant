@@ -15,7 +15,12 @@ class DocumentSummaryService:
         self.mongo_collection = mongo_db["document_summaries"]
 
     async def save_manual_summary(
-        self, user_id: int, document_id: int, title: str, summary_text: str, config: dict
+        self,
+        user_id: int,
+        document_id: int,
+        title: str,
+        summary_text: str,
+        config: dict,
     ):
         """
         Lưu mới hoàn toàn một bản tóm tắt thủ công.
@@ -27,7 +32,8 @@ class DocumentSummaryService:
         )
         if not doc:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tài liệu hợp lệ"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy tài liệu hợp lệ",
             )
 
         mongo_data = {
@@ -69,7 +75,8 @@ class DocumentSummaryService:
         )
         if not summary_meta:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Bản tóm tắt không tồn tại"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bản tóm tắt không tồn tại",
             )
 
         await self.mongo_collection.update_one(
@@ -80,7 +87,10 @@ class DocumentSummaryService:
         summary_meta.updated_at = datetime.now(UTC)
         self.sql_db.commit()
 
-        return {"summary_id": summary_meta.id, "message": "Ghi đè bản tóm tắt thành công."}
+        return {
+            "summary_id": summary_meta.id,
+            "message": "Ghi đè bản tóm tắt thành công.",
+        }
 
     def get_summary_history_list(self, user_id: int, document_id: int = None):
         """
@@ -89,7 +99,9 @@ class DocumentSummaryService:
         Nếu không truyền: Lấy toàn bộ lịch sử tóm tắt của User theo thứ tự thời gian mới nhất lên đầu.
         """
         query = (
-            self.sql_db.query(DocumentSummary).join(Document).filter(Document.user_id == user_id)
+            self.sql_db.query(DocumentSummary)
+            .join(Document)
+            .filter(Document.user_id == user_id)
         )
 
         if document_id:
@@ -110,7 +122,8 @@ class DocumentSummaryService:
         )
         if not summary_meta:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Bản tóm tắt không tồn tại"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bản tóm tắt không tồn tại",
             )
 
         # Bốc text từ Mongo

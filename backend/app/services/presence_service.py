@@ -13,9 +13,13 @@ class PresenceService:
         self.redis = redis
 
     async def mark_online(self, user_id: int) -> None:
-        await self.redis.setex(f"user:status:{user_id}", ONLINE_STATUS_EXPIRE_SECONDS, "online")
         await self.redis.setex(
-            f"user:last_active:{user_id}", REFRESH_TOKEN_EXPIRE_MINUTES * 60, int(time.time())
+            f"user:status:{user_id}", ONLINE_STATUS_EXPIRE_SECONDS, "online"
+        )
+        await self.redis.setex(
+            f"user:last_active:{user_id}",
+            REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+            int(time.time()),
         )
 
     async def clear_online_status(self, user_id: int) -> None:
