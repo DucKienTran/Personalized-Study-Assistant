@@ -49,5 +49,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
     ONLINE_STATUS_EXPIRE_SECONDS: int = 300
 
+    # AI model
+    GEMINI_MODEL: str
 
 settings = Settings()
