@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import time
 from typing import List
 import uuid
 
-import jwt
 from fastapi import Response
+import jwt
 from passlib.context import CryptContext
 from redis.asyncio import Redis
 
@@ -14,6 +15,8 @@ from app.exceptions import (
     InvalidTokenError,
     InvalidTokenTypeError,
 )
+
+logger = logging.getLogger(__name__)
 
 # PASSWORD HASHING
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -51,16 +54,12 @@ def create_refresh_token(data: dict) -> str:
     Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=REFRESH_TOKEN_EXPIRE_MINUTES
-    )
+    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def generate_tokens_pair(
-    user_id: int, email: str, role_name: str, permissions: List[str]
-) -> dict:
+def generate_tokens_pair(user_id: int, email: str, role_name: str, permissions: List[str]) -> dict:
     """
     Hàm tạo cả cặp token Access & Refresh
     """
@@ -85,23 +84,41 @@ def generate_tokens_pair(
 
 def decode_token(token: str, expected_type: str, raise_on_error: bool = True) -> dict:
     try:
-        # Giải mã token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-        # Kiểm tra trường token_type
         token_type = payload.get("token_type")
         if token_type != expected_type:
+            logger.warning(
+                "JWT token type mismatch. expected=%s actual=%s",
+                expected_type,
+                token_type,
+            )
+
             if raise_on_error:
                 raise InvalidTokenTypeError(expected_type)
+
             return None
 
         return payload
 
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
-        if raise_on_error:
-            if isinstance(e, jwt.ExpiredSignatureError):
-                raise ExpiredTokenError()
+    except jwt.ExpiredSignatureError:
+        logger.info(
+            "JWT expired. expected_type=%s",
+            expected_type,
+        )
 
+        if raise_on_error:
+            raise ExpiredTokenError()
+
+        return None
+
+    except jwt.InvalidTokenError:
+        logger.warning(
+            "Invalid JWT. expected_type=%s",
+            expected_type,
+        )
+
+        if raise_on_error:
             raise InvalidTokenError()
 
         return None
