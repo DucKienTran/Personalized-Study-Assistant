@@ -15,6 +15,7 @@ class SaveSummaryRequest(BaseModel):
 
 
 class OverwriteSummaryRequest(BaseModel):
+    title: str | None = None
     summary_text: str
 
 
