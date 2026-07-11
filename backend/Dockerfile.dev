@@ -19,4 +19,5 @@ COPY . .
 EXPOSE 8000
 
 # DEV: auto-reload, exclude app.log 
+# Powershell:  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude app.log
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-exclude", "app.log"]
