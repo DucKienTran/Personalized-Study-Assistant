@@ -26,7 +26,9 @@ class SummaryService:
         format_type: str,
         instruction: str,
     ) -> str:
-        parsed_document = await self.document_collection.find_one({"_id": ObjectId(mongo_id)})
+        parsed_document = await self.document_collection.find_one(
+            {"_id": ObjectId(mongo_id)}
+        )
 
         if not parsed_document or "content_raw" not in parsed_document:
             raise ValueError("Không tìm thấy nội dung tài liệu trong MongoDB.")
