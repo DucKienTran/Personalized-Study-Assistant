@@ -52,4 +52,5 @@ class Settings(BaseSettings):
     # AI model
     GEMINI_MODEL: str
 
+
 settings = Settings()

@@ -54,12 +54,16 @@ def create_refresh_token(data: dict) -> str:
     Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=REFRESH_TOKEN_EXPIRE_MINUTES
+    )
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def generate_tokens_pair(user_id: int, email: str, role_name: str, permissions: List[str]) -> dict:
+def generate_tokens_pair(
+    user_id: int, email: str, role_name: str, permissions: List[str]
+) -> dict:
     """
     Hàm tạo cả cặp token Access & Refresh
     """

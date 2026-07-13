@@ -26,6 +26,7 @@ from app.services.document.parser import DocumentParserService
 from app.services.document.summary_record_service import SummaryRecordService
 from app.services.presence_service import PresenceService
 from app.services.user_service import UserService
+from app.services.ai.quiz_service import QuizService
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -58,7 +59,7 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> CurrentUser:
     """
-    Dependency lấy thông tin người dùng từ Access Token 
+    Dependency lấy thông tin người dùng từ Access Token
     """
     token = credentials.credentials
     payload = decode_token(token, expected_type="access", raise_on_error=True)
@@ -144,15 +145,27 @@ def get_summary_service(
 
 def get_document_service(
     db: Annotated[Session, Depends(get_db)],
-    parser_service: Annotated[DocumentParserService, Depends(get_document_parser_service)],
+    parser_service: Annotated[
+        DocumentParserService, Depends(get_document_parser_service)
+    ],
 ) -> DocumentService:
-    return DocumentService(sql_db=db, mongo_db=mongo_client.db, parser_service=parser_service)
+    return DocumentService(
+        sql_db=db, mongo_db=mongo_client.db, parser_service=parser_service
+    )
 
 
 def get_summary_record_service(
     db: Annotated[Session, Depends(get_db)],
 ) -> SummaryRecordService:
     return SummaryRecordService(sql_db=db, mongo_db=mongo_client.db)
+
+
+def get_quiz_service(
+    db: Session = Depends(get_db),
+    document_service: DocumentService = Depends(get_document_service),
+    llm_client: LLMClient = Depends(get_llm_client),
+) -> QuizService:
+    return QuizService(db, document_service, llm_client)
 
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -162,7 +175,9 @@ PresenceServiceDep = Annotated[PresenceService, Depends(get_presence_service)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
-DocumentParserServiceDep = Annotated[DocumentParserService, Depends(get_document_parser_service)]
+DocumentParserServiceDep = Annotated[
+    DocumentParserService, Depends(get_document_parser_service)
+]
 SummaryServiceDep = Annotated[
     SummaryService,
     Depends(get_summary_service),
@@ -173,3 +188,5 @@ SummaryRecordServiceDep = Annotated[
     SummaryRecordService,
     Depends(get_summary_record_service),
 ]
+
+QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service)]
