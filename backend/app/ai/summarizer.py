@@ -18,7 +18,9 @@ class AISummarizerService:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("models/gemini-2.5-flash")
 
-    async def generate_summary(self, mongo_id: str, level: str, format_type: str, instruction: str):
+    async def generate_summary(
+        self, mongo_id: str, level: str, format_type: str, instruction: str
+    ):
         doc = await self.collection.find_one({"_id": ObjectId(mongo_id)})
         if not doc or "content_raw" not in doc:
             raise ValueError("Không tìm thấy nội dung tài liệu trong MongoDB")
@@ -32,7 +34,9 @@ class AISummarizerService:
             print(f"[Cache Hit] Đã trả về kết quả cũ cho config: {cache_key}")
             return doc["summaries"][cache_key]
 
-        prompt = SummaryPromptBuilder.build(content_raw, level, format_type, instruction)
+        prompt = SummaryPromptBuilder.build(
+            content_raw, level, format_type, instruction
+        )
 
         # --- ĐÂY LÀ ĐOẠN GỌI AI THẬT ---
         try:

@@ -1,123 +1,238 @@
-from typing import List
+from typing import List, Optional
 
 
-class QuizPrompt:
-    @staticmethod
-    def generate_quiz_prompt(
-        content_raw: str,
-        question_types: List[str],
-        total_questions: int,
-        level: str
-    ) -> str:
-        """
-        Xây dựng hệ thống Prompt ép AI trả về cấu trúc đề thi hỗn hợp gồm 6 dạng JSON thuần.
-        """
-        # Ánh xạ thông tin hiển thị loại câu hỏi sang tiếng Việt trong prompt để AI hiểu ngữ cảnh
-        type_mapping = {
-            "multiple_choice": "Trắc nghiệm 1 lựa chọn đúng (multiple_choice)",
-            "multiple_response": "Trắc nghiệm NHIỀU lựa chọn đúng (multiple_response)",
-            "true_false": "Đúng/Sai (true_false)",
-            "fill_blank": "Điền vào chỗ trống ngữ cảnh (fill_blank)",
-            "short_answer": "Trả lời ngắn/Điền số chuẩn hóa (short_answer)",
-            "essay": "Tự luận/Câu hỏi mở (essay)"
-        }
-        requested_types = [type_mapping.get(t, t) for t in question_types]
-        requested_types_str = ", ".join(requested_types)
+class QuizPromptBuilder:
+    """
+    Sinh prompt cho việc tạo đề thi bằng AI, tách 2 nhánh: simple / custom.
+    Nguyên tắc: KHÔNG parse custom_instruction bằng code — để LLM tự hiểu ngôn ngữ tự nhiên,
+    backend chỉ ép ràng buộc CỨNG (tổng điểm, JSON schema, chống bịa nội dung).
+    """
 
-        return f"""Bạn là một chuyên gia khảo thí và AI giáo dục cao cấp. Nhiệm vụ của bạn là đọc kỹ tài liệu thô được cung cấp dưới đây và biên soạn một bộ câu hỏi đạt chuẩn giáo dục dựa trên các yêu cầu sau:
+    _JSON_SCHEMA_RULES = """
+--- QUY TẮC ĐỊNH DẠNG CẤU TRÚC JSON (BẮT BUỘC) ---
+Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc sau:
 
---- YÊU CẦU BỘ ĐỀ CHÚNG TÔI CẦN ---
-1. Tổng số câu hỏi: {total_questions} câu.
-2. Độ khó mục tiêu: Mức độ "{level}" (Nhận biết/Thông hiểu/Vận dụng/Vận dụng cao).
-3. Các dạng câu hỏi cần phân bổ: {requested_types_str}.
-4. Mỗi câu hỏi cần được gán trọng số điểm (`points`) tương ứng với độ khó của chính câu hỏi đó (Ví dụ: Câu nhận biết = 1 điểm, câu vận dụng cao = 2 hoặc 3 điểm).
+{
+  "quiz_title": "Tên bộ đề ngắn gọn",
+  "questions": [
+    {
+      ...
+    }
+  ]
+}
 
---- NỘI DUNG TÀI LIỆU NGUỒN ---
-{content_raw}
+Yêu cầu:
+- quiz_title: dưới 12 từ.
+- Phản ánh chủ đề chính của tài liệu.
+- Không dùng tên chung chung như "Đề thi", "Quiz", "Bài kiểm tra".
+nội dung tài liệu nguồn — KHÔNG dùng tên chung chung như "Đề thi", "Bài kiểm tra".
+Ví dụ tốt: "Kiểm tra chương 2: Cấu trúc dữ liệu và giải thuật"
+Nội dung trả về KHÔNG bọc trong markdown code fence.
+KHÔNG thêm bất kỳ chữ giải thích nào trước/sau khối JSON.
 
---- QUY TẮC ĐỊNH DẠNG CẤU TRÚC JSON ---
-Bạn BẮT BUỘC phải trả về dữ liệu dạng JSON Array thuần túy, tuyệt đối không chèn thêm bất kỳ chữ giải thích nào ngoài khối JSON. Mỗi object câu hỏi trong mảng phải có cấu trúc chính xác theo từng loại như sau:
+Mỗi object câu hỏi PHẢI có đúng các field sau, tuỳ theo question_type:
 
-1. Dạng câu hỏi "multiple_choice" (Trắc nghiệm 1 đáp án đúng):
-{{
-  "question_text": "Chuỗi văn bản câu hỏi...",
-  "question_type": "multiple_choice", 
-  "options": ["A. Lựa chọn một", "B. Lựa chọn hai", "C. Lựa chọn ba", "D. Lựa chọn bốn"],
+1. "multiple_choice":
+{
+  "question_text": "...",
+  "question_type": "multiple_choice",
+  "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
   "correct_answer": "A",
-  "explanations": {{
-    "A": "Giải thích tại sao đáp án A đúng...",
-    "B": "Giải thích tại sao đáp án B sai...",
-    "C": "Giải thích tại sao C sai...",
-    "D": "Giải thích tại sao D sai..."
-  }},
-  "points": 1,
-  "hint": "Gợi ý làm bài ngắn gọn (nếu có)"
-}}
+  "explanations": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "points": 4,
+  "hint": "..."
+}
 
-2. Dạng câu hỏi "multiple_response" (Trắc nghiệm NHIỀU đáp án đúng):
-{{
-  "question_text": "Chuỗi văn bản câu hỏi (Yêu cầu người học chọn TẤT CẢ các đáp án đúng)...",
-  "question_type": "multiple_response", 
-  "options": ["A. Phương án một", "B. Phương án hai", "C. Phương án ba", "D. Phương án bốn"],
+2. "multiple_response" (nhiều đáp án đúng):
+{
+  "question_text": "...",
+  "question_type": "multiple_response",
+  "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
   "correct_answer": ["A", "C"],
-  "explanations": {{
-    "A": "Giải thích tại sao phương án A đúng...",
-    "B": "Giải thích tại sao phương án B sai...",
-    "C": "Giải thích tại sao phương án C đúng...",
-    "D": "Giải thích tại sao phương án D sai..."
-  }},
-  "points": 2,
-  "hint": "Lưu ý câu hỏi này có nhiều hơn một đáp án đúng."
-}}
+  "explanations": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "points": 4,
+  "hint": "..."
+}
 
-3. Dạng câu hỏi "true_false" (Đúng / Sai):
-{{
-  "question_text": "Chuỗi văn bản mệnh đề cần xác định tính đúng sai...",
-  "question_type": "true_false", 
+3. "true_false":
+{
+  "question_text": "...",
+  "question_type": "true_false",
   "options": null,
   "correct_answer": true,
-  "explanations": {{
-    "general": "Giải thích tường tận tại sao mệnh đề này lại Đúng hoặc Sai dựa trên tài liệu..."
-  }},
-  "points": 1,
-  "hint": null
-}}
+  "explanations": {"general": "..."},
+  "points": 2,
+  "hint": "..."
+}
 
-4. Dạng câu hỏi "fill_blank" (Điền khuyết bằng text):
-{{
-  "question_text": "Chuỗi văn bản chứa chỗ trống, sử dụng ký tự [blank] để đánh dấu vị trí cần điền.",
+4. "fill_blank":
+{
+  "question_text": "Câu chứa [blank] cần điền.",
   "question_type": "fill_blank",
   "options": null,
-  "correct_answer": ["đáp án đúng nhất", "đáp án biến thể chấp nhận được"],
-  "explanations": {{
-    "general": "Giải thích tại sao từ/cụm từ này lại phù hợp vào ngữ cảnh của câu..."
-  }},
-  "points": 1,
-  "hint": "Gợi ý từ loại hoặc ký tự đầu tiên"
-}}
+  "correct_answer": ["đáp án đúng 1", "cách viết chấp nhận được 2"],
+  "explanations": {"general": "..."},
+  "points": 3,
+  "hint": "..."
+}
 
-5. Dạng câu hỏi "short_answer" (Trả lời ngắn - Điền số chuẩn hóa, thích hợp cho bài tập tính toán):
-{{
-  "question_text": "Nội dung bài tập tính toán yêu cầu đưa ra kết quả bằng số cụ thể...",
+5. "short_answer" (trả lời ngắn bằng số/ký hiệu, kiểu đề thi Toán):
+{
+  "question_text": "...",
   "question_type": "short_answer",
   "options": null,
   "correct_answer": "3.14",
-  "explanations": {{
-    "general": "Trình bày tóm tắt các bước giải toán, công thức áp dụng để ra được đáp số."
-  }},
-  "points": 2,
-  "hint": "Lấy giá trị xấp xỉ đến 2 chữ số thập phân hoặc điền số nguyên chuẩn hóa (VD: 3.14, -12, 0.5)"
-}}
+  "explanations": {"general": "..."},
+  "points": 3,
+  "hint": "..."
+}
 
-6. Dạng câu hỏi "essay" (Tự luận / Câu hỏi mở rộng):
-{{
-  "question_text": "Nội dung câu hỏi tự luận yêu cầu lập luận, phân tích sâu...",
+6. "essay":
+{
+  "question_text": "...",
   "question_type": "essay",
   "options": null,
-  "correct_answer": ["Ý chính 1 cần đạt", "Ý chính 2 cần đạt", "Tiêu chí chấm điểm (Rubric)..."],
+  "correct_answer": ["Ý chính 1 cần có", "Ý chính 2 cần có", "Tiêu chí chấm điểm..."],
   "explanations": null,
-  "points": 3,
-  "hint": "Gợi ý các hướng tiếp cận khía cạnh luận điểm"
-}}
+  "points": 5,
+  "hint": "..."
+}
+"""
 
-Hãy đảm bảo rằng mảng JSON chứa chính xác {total_questions} câu hỏi với các định dạng tương ứng như trên. Hãy bắt đầu sinh dữ liệu JSON ngay dưới đây:"""
+    _HARD_CONSTRAINTS = """
+--- RÀNG BUỘC BẮT BUỘC PHẢI TUÂN THỦ ---
+1. Tổng điểm (points) của TẤT CẢ câu hỏi PHẢI cộng lại CHÍNH XÁC bằng: {target_total_points}.
+   Đây là ràng buộc cứng, không được sai lệch dù chỉ 1 điểm.
+2. Sinh đúng {total_questions} câu nếu có thể. Nếu tài liệu nguồn KHÔNG đủ nội dung để
+   sinh đủ số câu có chất lượng, hãy sinh ÍT HƠN thay vì bịa thêm nội dung không có
+   trong tài liệu. TUYỆT ĐỐI KHÔNG sinh NHIỀU HƠN số câu yêu cầu.
+3. Không được tự chế đề, câu hỏi bịa, hoặc câu hỏi mơ hồ không có căn cứ.
+4. Không được bịa đặt sự kiện/số liệu nằm ngoài nội dung tài liệu nguồn được cung cấp.
+5. Mọi đáp án và giải thích PHẢI có căn cứ trực tiếp từ nội dung tài liệu nguồn.
+6. Mỗi câu hỏi PHẢI kiểm tra một điểm kiến thức RIÊNG BIỆT. Không hỏi lại cùng 1 khái
+   niệm bằng cách diễn đạt khác nhau (trừ khi người dùng yêu cầu rõ điều này).
+7. KHÔNG được để lộ đáp án ngay trong nội dung câu hỏi (ví dụ: không mô tả định nghĩa
+   đầy đủ của khái niệm rồi hỏi lại chính khái niệm đó).
+
+"""
+
+    @staticmethod
+    def _build_source_and_schema(
+        content_raw: str, target_total_points: int, total_questions: int
+    ) -> str:
+        constraints = QuizPromptBuilder._HARD_CONSTRAINTS.format(
+            target_total_points=target_total_points, total_questions=total_questions
+        )
+        return f"""
+--- NỘI DUNG TÀI LIỆU NGUỒN ---
+{content_raw}
+{constraints}
+{QuizPromptBuilder._JSON_SCHEMA_RULES}
+
+Hãy bắt đầu sinh dữ liệu JSON ngay dưới đây:"""
+
+    @staticmethod
+    def build_simple(
+        content_raw: str,
+        total_questions: int,
+        difficulty: str,  # "easy" | "medium" | "hard" | "mixed"
+        question_types: List[str],
+        target_total_points: int,
+    ) -> str:
+        difficulty_instruction = {
+            "easy": "Toàn bộ câu hỏi ở mức độ Nhận biết/Dễ.",
+            "medium": "Toàn bộ câu hỏi ở mức độ Thông hiểu/Trung bình.",
+            "hard": "Toàn bộ câu hỏi ở mức độ Vận dụng/Vận dụng cao/Khó.",
+            "mixed": (
+                "Trộn độ khó theo tỉ lệ: 40% Dễ (Nhận biết), 40% Trung bình (Thông hiểu), "
+                "20% Khó (Vận dụng/Vận dụng cao). KHÔNG gom nhóm các câu cùng độ khó lại "
+                "gần nhau — trộn ngẫu nhiên thứ tự trong toàn bộ đề."
+            ),
+        }.get(
+            difficulty,
+            "Độ khó trung bình, phù hợp trình độ phổ thông/đại học đại cương.",
+        )
+
+        types_instruction = (
+            f"Các dạng câu hỏi cần dùng: {', '.join(question_types)}.\n"
+            f"Nếu người dùng không chỉ định tỉ lệ cụ thể giữa các dạng, hãy PHÂN BỔ ĐỀU "
+            f"nhất có thể giữa {len(question_types)} dạng trên (ví dụ 15 câu, 3 dạng → 5-5-5; "
+            f"nếu chia không hết, phần dư phân bổ thêm vào dạng đầu tiên)."
+        )
+
+        header = f"""Bạn là chuyên gia khảo thí AI. Biên soạn bộ đề thi dựa trên tài liệu nguồn dưới đây theo cấu hình:
+
+--- CẤU HÌNH (SIMPLE MODE) ---
+Số câu hỏi mong muốn: {total_questions}
+Độ khó: {difficulty_instruction}
+{types_instruction}
+"""
+        return header + QuizPromptBuilder._build_source_and_schema(
+            content_raw, target_total_points, total_questions
+        )
+
+    @staticmethod
+    def build_custom(
+        content_raw: str,
+        total_questions: int,
+        target_total_points: int,
+        custom_instruction: str,
+        question_types: Optional[List[str]] = None,
+        difficulty: Optional[str] = None,
+    ) -> str:
+        default_types = (
+            f"Mặc định nếu không được chỉ định trong yêu cầu: {', '.join(question_types)}."
+            if question_types
+            else ""
+        )
+        default_difficulty = (
+            f"Độ khó mặc định nếu không được chỉ định trong yêu cầu: {difficulty}."
+            if difficulty
+            else ""
+        )
+
+        header = f"""Bạn là chuyên gia khảo thí AI. Biên soạn bộ đề thi dựa trên tài liệu nguồn dưới đây.
+
+--- YÊU CẦU TUỲ CHỈNH TỪ NGƯỜI DÙNG (ƯU TIÊN TUYỆT ĐỐI) ---
+{custom_instruction}
+
+--- THỨ TỰ ƯU TIÊN KHI CÓ THÔNG TIN THIẾU HOẶC MÂU THUẪN ---
+Ưu tiên 1: Tuân theo ĐÚNG yêu cầu tuỳ chỉnh ở trên (loại câu hỏi, tỉ lệ %, độ khó, thứ tự sắp xếp...).
+Ưu tiên 2: Với bất kỳ thuộc tính nào yêu cầu tuỳ chỉnh KHÔNG đề cập tới, dùng cấu hình mặc định sau:
+{default_types}
+{default_difficulty}
+Số câu hỏi mong muốn (nếu yêu cầu tuỳ chỉnh không nói rõ số lượng): {total_questions}
+
+Nếu yêu cầu tuỳ chỉnh và cấu hình mặc định MÂU THUẪN nhau, LUÔN ưu tiên yêu cầu tuỳ chỉnh.
+"""
+        return header + QuizPromptBuilder._build_source_and_schema(
+            content_raw, target_total_points, total_questions
+        )
+
+    @staticmethod
+    def build(
+        generation_mode: str,
+        content_raw: str,
+        total_questions: int,
+        target_total_points: int,
+        question_types: Optional[List[str]] = None,
+        difficulty: Optional[str] = None,
+        custom_instruction: Optional[str] = None,
+    ) -> str:
+        if generation_mode == "custom":
+            return QuizPromptBuilder.build_custom(
+                content_raw=content_raw,
+                total_questions=total_questions,
+                target_total_points=target_total_points,
+                custom_instruction=custom_instruction or "Không có yêu cầu bổ sung.",
+                question_types=question_types,
+                difficulty=difficulty,
+            )
+
+        return QuizPromptBuilder.build_simple(
+            content_raw=content_raw,
+            total_questions=total_questions,
+            difficulty=difficulty or "medium",
+            question_types=question_types or ["multiple_choice"],
+            target_total_points=target_total_points,
+        )

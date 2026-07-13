@@ -32,9 +32,7 @@ class SummaryPromptBuilder:
         }
 
         instruction_prompt = (
-            f"Yêu cầu bổ sung từ người dùng: {instruction}\n"
-            if instruction
-            else ""
+            f"Yêu cầu bổ sung từ người dùng: {instruction}\n" if instruction else ""
         )
 
         return (
