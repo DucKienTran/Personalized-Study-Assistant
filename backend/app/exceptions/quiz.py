@@ -5,7 +5,8 @@ class QuizNotFoundError(NotFoundError):
     error_code = "quiz_not_found"
 
     def __init__(
-        self, message: str = "Không tìm thấy đề thi phù hợp hoặc bạn không có quyền truy cập."
+        self,
+        message: str = "Không tìm thấy đề thi phù hợp hoặc bạn không có quyền truy cập.",
     ):
         super().__init__(message)
 

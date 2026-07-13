@@ -1,36 +1,60 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from bson import ObjectId
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.ai.llm.base import LLMClient
 from app.ai.output.quiz_parser import QuizParser
-from app.ai.prompts.quiz_prompt import QuizPrompt
+from app.ai.prompts.quiz_prompt import QuizPromptBuilder
 from app.exceptions.quiz import InvalidQuizOperationError, QuizNotFoundError
-from app.models.quiz_model import Quiz, QuizProgress, QuizQuestion, QuizResult
+from app.models.quiz_model import Quiz, QuizAttempt, QuizProgress, QuizQuestion
 from app.services.document.document_service import DocumentService
+from app.models.document_model import Document
 
 logger = logging.getLogger(__name__)
 
 
 class QuizService:
-    def __init__(self, db: Session, document_service: DocumentService, ai_client: LLMClient):
+    def __init__(
+        self, db: Session, document_service: DocumentService, ai_client: LLMClient
+    ):
         self.db = db
         self.document_service = document_service
         self.ai_client = ai_client
 
+    # TẠO ĐỀ
     def create_quiz_placeholder(
-        self, document_id: int, user_id: int, title: str, mode: str, time_limit: Optional[int]
+        self,
+        document_id: int,
+        user_id: int,
+        title: str,
+        mode: str,  # study | exam
+        time_limit_minutes: Optional[int],  # only for exam
+        target_total_points: int,  # only for custom gen mode
+        generation_mode: str,  # simple | custome
+        difficulty: Optional[str],  # easy | medium | hard | mix
+        custom_instruction: Optional[str],
     ) -> Quiz:
+
+        # Kiểm tra tài liệu có thuộc user này không
+        doc = self.document_service.get_documents(
+            user_id=user_id, document_id=document_id
+        )
+        if not doc:
+            raise QuizNotFoundError("Không tìm thấy tài liệu để tạo đề thi.")
+
         quiz = Quiz(
             document_id=document_id,
             user_id=user_id,
             title=title,
             mode=mode,
-            time_limit_minutes=time_limit,
-            status="processing",
+            time_limit_minutes=time_limit_minutes,
+            target_total_points=target_total_points,
+            generation_mode=generation_mode,
+            difficulty=difficulty,
+            custom_instruction=custom_instruction,
+            generation_status="processing",
         )
         self.db.add(quiz)
         self.db.commit()
@@ -38,39 +62,49 @@ class QuizService:
         return quiz
 
     async def run_generation(
-        self, quiz_id: int, question_types: List[str], total_questions: int, level: str
+        self, quiz_id: int, question_types: List[str], total_questions: int
     ) -> None:
+        """Chạy trong BackgroundTasks, không được raise ra ngoài, bắt lỗi và ghi generation_status (trạng thái tạo đề)."""
         quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz:
             return
 
         try:
-            doc_sql = self.document_service.get_documents(
-                user_id=quiz.user_id, document_id=quiz.document_id
-            )
-            if not doc_sql:
-                raise ValueError("Không tìm thấy thông tin tài liệu trong hệ thống SQL.")
-
-            document_data = await self.document_service.mongo_collection.find_one(
-                {"_id": ObjectId(doc_sql.mongo_id)}
+            document_data = await self.document_service.get_document_content(
+                quiz.document_id, quiz.user_id
             )
             if not document_data or "content_raw" not in document_data:
-                raise ValueError("Không thể lấy nội dung thô từ cơ sở dữ liệu MongoDB.")
+                raise ValueError("Không thể lấy nội dung thô từ tài liệu.")
 
-            prompt = QuizPrompt.generate_quiz_prompt(
+            prompt = QuizPromptBuilder.build(
+                generation_mode=quiz.generation_mode,
                 content_raw=document_data["content_raw"],
-                question_types=question_types,
                 total_questions=total_questions,
-                level=level,
+                target_total_points=quiz.target_total_points,
+                question_types=question_types,
+                difficulty=quiz.difficulty,
+                custom_instruction=quiz.custom_instruction,
             )
 
             ai_response_text = await self.ai_client.generate(prompt)
             if not ai_response_text:
                 raise ValueError("Mô hình AI không trả về dữ liệu bộ đề.")
 
-            questions_parsed = QuizParser.parse_quiz_response(ai_response_text)
+            parsed_result = QuizParser.parse_quiz_response(ai_response_text)
 
-            for q_data in questions_parsed:
+            questions = parsed_result["questions"]
+            quiz_title = parsed_result["quiz_title"]
+            if not questions:
+                raise ValueError(
+                    "AI không thể sinh được câu hỏi nào từ tài liệu này. "
+                    "Tài liệu có thể quá ngắn hoặc không đủ nội dung để tạo đề."
+                )
+
+            questions = self._patch_points_distributed(
+                questions,
+                quiz.target_total_points,
+            )
+            for q_data in questions:
                 question = QuizQuestion(
                     quiz_id=quiz_id,
                     question_text=q_data["question_text"],
@@ -83,36 +117,88 @@ class QuizService:
                 )
                 self.db.add(question)
 
-            quiz.status = "completed"
+            # Gửi về thông báo nếu không thể sinh đủ số lượng câu so với đề
+            actual_count = len(questions)
+            if actual_count < total_questions:
+                quiz.error_message = (
+                    f"Tài liệu không đủ nội dung để sinh đủ {total_questions} câu — "
+                    f"thực tế tạo ra {actual_count} câu."
+                )
+            quiz.title = quiz_title
+            quiz.generation_status = "completed"
             self.db.commit()
 
         except Exception as e:
             self.db.rollback()
-            quiz.status = "failed"
+            quiz.generation_status = "failed"
+            quiz.error_message = str(e)
             self.db.commit()
-            logger.error(f"Lỗi tiến trình sinh đề tự động cho đề thi {quiz_id}: {str(e)}")
+            logger.error(
+                f"Lỗi tiến trình sinh đề tự động cho đề thi {quiz_id}: {str(e)}"
+            )
 
+    @staticmethod
+    def _patch_points_distributed(questions: List[dict], target: int) -> List[dict]:
+        """Dùng để vá nếu tổng số điểm do AI sinh ra không bằng Quiz[target_total_points].
+        Nếu tổng điểm các câu hỏi do AI sinh ra nhỏ hơn thì cộng lần lượt 1đ vào các
+        câu hỏi có điểm cao nhất cho đến khi tổng điểm bằng target_total_points. Nếu lớn hơn
+        thì trừ lần lượt, nếu mọi câu đều trừ về còn 1đ mà vẫn chưa bằng nhau thì báo lỗi
+        """
+        drift = target - sum(q["points"] for q in questions)
+        if drift == 0 or not questions:
+            return questions
+
+        if drift > 0:
+            while drift > 0:
+                for q in sorted(questions, key=lambda x: x["points"]):
+                    q["points"] += 1
+                    drift -= 1
+                    if drift == 0:
+                        break
+        else:
+            drift = abs(drift)
+            while drift > 0:
+                candidates = [q for q in questions if q["points"] > 1]
+                if not candidates:
+                    raise ValueError(
+                        f"Không thể hiệu chỉnh tổng điểm về {target} vì mọi câu đều đã ở mức tối thiểu 1 điểm. "
+                        f"Hãy tăng target_total_points hoặc giảm total_questions."
+                    )
+                for q in sorted(candidates, key=lambda x: x["points"], reverse=True):
+                    q["points"] -= 1
+                    drift -= 1
+                    if drift == 0:
+                        break
+
+        logger.warning(f"AI sinh lệch tổng điểm, đã tự vá lại cho khớp target={target}")
+        return questions
+
+    # LÀM BÀI
     def get_quiz_for_rendering(self, quiz_id: int, user_id: int) -> Dict[str, Any]:
         quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz or quiz.user_id != user_id:
             raise QuizNotFoundError()
 
-        questions = self.db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz_id).all()
+        questions = (
+            self.db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz_id).all()
+        )
 
-        active_result = (
-            self.db.query(QuizResult)
+        active_attempt = (
+            self.db.query(QuizAttempt)
             .filter(
-                QuizResult.quiz_id == quiz_id,
-                QuizResult.user_id == user_id,
-                QuizResult.attempt_status == "in_progress",
+                QuizAttempt.quiz_id == quiz_id,
+                QuizAttempt.user_id == user_id,
+                QuizAttempt.attempt_status == "in_progress",
             )
             .first()
         )
 
         progress_map = {}
-        if active_result:
+        if active_attempt:
             progress_records = (
-                self.db.query(QuizProgress).filter(QuizProgress.result_id == active_result.id).all()
+                self.db.query(QuizProgress)
+                .filter(QuizProgress.attempt_id == active_attempt.id)
+                .all()
             )
             progress_map = {p.question_id: p for p in progress_records}
 
@@ -121,7 +207,9 @@ class QuizService:
             "title": quiz.title,
             "mode": quiz.mode,
             "time_limit_minutes": quiz.time_limit_minutes,
-            "status": quiz.status,
+            "target_total_points": quiz.target_total_points,
+            "generation_status": quiz.generation_status,
+            "error_message": quiz.error_message,
             "questions": [],
         }
 
@@ -133,7 +221,7 @@ class QuizService:
                 "question_type": q.question_type,
                 "options": q.options,
                 "points": q.points,
-                "hint": q.hint if quiz.mode == "study" else None,
+                "hint": q.hint,
                 "user_answer": user_progress.user_answer if user_progress else None,
             }
 
@@ -147,15 +235,202 @@ class QuizService:
 
         return quiz_data
 
+    def get_quizzes(
+        self,
+        user_id: int,
+        document_id: int | None = None,
+    ) -> List[Dict[str, Any]]:
+        query = self.db.query(Quiz).filter(Quiz.user_id == user_id)
+
+        if document_id is not None:
+            query = query.filter(Quiz.document_id == document_id)
+
+        quizzes = query.order_by(desc(Quiz.created_at)).all()
+
+        result = []
+
+        for quiz in quizzes:
+            if quiz.generation_status != "completed":
+                derived_status = quiz.generation_status
+            else:
+                latest_attempt = (
+                    self.db.query(QuizAttempt)
+                    .filter(
+                        QuizAttempt.quiz_id == quiz.id,
+                        QuizAttempt.user_id == user_id,
+                    )
+                    .order_by(desc(QuizAttempt.created_at))
+                    .first()
+                )
+
+                if latest_attempt is None:
+                    derived_status = "todo"
+                elif latest_attempt.attempt_status == "in_progress":
+                    derived_status = "in_progress"
+                else:
+                    derived_status = "completed"
+
+            result.append(
+                {
+                    "id": quiz.id,
+                    "document_id": quiz.document_id,
+                    "title": quiz.title,
+                    "mode": quiz.mode,
+                    "generation_status": quiz.generation_status,
+                    "derived_status": derived_status,
+                    "error_message": quiz.error_message,
+                    "created_at": quiz.created_at,
+                }
+            )
+
+        return result
+
+    def get_quiz_attempts_list(
+        self, quiz_id: int, user_id: int
+    ) -> List[Dict[str, Any]]:
+        quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz or quiz.user_id != user_id:
+            raise QuizNotFoundError()
+
+        attempts = (
+            self.db.query(QuizAttempt)
+            .filter(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == user_id)
+            .order_by(desc(QuizAttempt.created_at))
+            .all()
+        )
+        return [
+            {
+                "id": a.id,
+                "score": a.score,
+                "attempt_status": a.attempt_status,
+                "submit_reason": a.submit_reason,
+                "created_at": a.created_at,
+            }
+            for a in attempts
+        ]
+
+    def get_attempt_detail(self, attempt_id: int, user_id: int) -> Dict[str, Any]:
+        attempt = (
+            self.db.query(QuizAttempt).filter(QuizAttempt.id == attempt_id).first()
+        )
+        if not attempt or attempt.user_id != user_id:
+            raise QuizNotFoundError()
+
+        progresses = (
+            self.db.query(QuizProgress)
+            .filter(QuizProgress.attempt_id == attempt.id)
+            .all()
+        )
+        progress_map = {p.question_id: p for p in progresses}
+
+        questions = (
+            self.db.query(QuizQuestion)
+            .filter(QuizQuestion.quiz_id == attempt.quiz_id)
+            .all()
+        )
+
+        question_details = []
+        for q in questions:
+            p = progress_map.get(q.id)
+            question_details.append(
+                {
+                    "question_id": q.id,
+                    "question_text": q.question_text,
+                    "question_type": q.question_type,
+                    "correct_answer": q.correct_answer,
+                    "explanations": q.explanations,
+                    "points": q.points,
+                    "user_answer": p.user_answer if p else None,
+                    "is_correct": p.is_correct if p else None,
+                    "ai_feedback": p.ai_feedback if p else None,
+                }
+            )
+
+        return {
+            "id": attempt.id,
+            "quiz_id": attempt.quiz_id,
+            "score": attempt.score,
+            "attempt_status": attempt.attempt_status,
+            "submit_reason": attempt.submit_reason,
+            "created_at": attempt.created_at,
+            "questions": question_details,
+        }
+
+    def get_quiz_hints(
+        self,
+        quiz_id: int,
+        user_id: int,
+    ) -> list[dict]:
+
+        quiz = (
+            self.db.query(Quiz)
+            .filter(
+                Quiz.id == quiz_id,
+                Quiz.user_id == user_id,
+            )
+            .first()
+        )
+
+        if quiz is None:
+            raise QuizNotFoundError()
+
+        questions = (
+            self.db.query(QuizQuestion)
+            .filter(
+                QuizQuestion.quiz_id == quiz_id,
+            )
+            .order_by(QuizQuestion.order_index)
+            .all()
+        )
+
+        return [
+            {
+                "question_id": q.id,
+                "hint": q.hint,
+            }
+            for q in questions
+        ]
+
+    def get_processing_quizzes(
+        self,
+        user_id: int,
+    ) -> list[dict]:
+        """Hiển trị trạng thái tạo đề của Quiz"""
+
+        quizzes = (
+            self.db.query(Quiz)
+            .join(Document, Quiz.document_id == Document.id)
+            .filter(
+                Quiz.user_id == user_id,
+                Quiz.generation_status == "processing",
+            )
+            .order_by(desc(Quiz.created_at))
+            .all()
+        )
+
+        return [
+            {
+                "id": quiz.id,
+                "title": quiz.title,
+                "document_title": quiz.document.title,
+                "generation_mode": quiz.generation_mode,
+                "difficulty": quiz.difficulty,
+                "total_questions": quiz.total_questions,
+                "created_at": quiz.created_at,
+            }
+            for quiz in quizzes
+        ]
+
     def save_single_answer_progress(
         self, quiz_id: int, question_id: int, user_id: int, user_answer: Any
     ) -> Dict[str, Any]:
         quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz or quiz.user_id != user_id:
             raise QuizNotFoundError()
-
         if quiz.mode != "study":
-            raise InvalidQuizOperationError("Chế độ chấm từng câu chỉ áp dụng cho chế độ học tập.")
+            raise InvalidQuizOperationError(
+                "Chế độ chấm từng câu chỉ áp dụng cho chế độ học tập."
+            )
 
         question = (
             self.db.query(QuizQuestion)
@@ -165,43 +440,42 @@ class QuizService:
         if not question:
             raise QuizNotFoundError("Không tìm thấy câu hỏi thuộc đề thi này.")
 
-        active_result = (
-            self.db.query(QuizResult)
+        active_attempt = (
+            self.db.query(QuizAttempt)
             .filter(
-                QuizResult.quiz_id == quiz_id,
-                QuizResult.user_id == user_id,
-                QuizResult.attempt_status == "in_progress",
+                QuizAttempt.quiz_id == quiz_id,
+                QuizAttempt.user_id == user_id,
+                QuizAttempt.attempt_status == "in_progress",
             )
             .first()
         )
-
-        if not active_result:
-            active_result = QuizResult(
+        if not active_attempt:
+            active_attempt = QuizAttempt(
                 quiz_id=quiz_id, user_id=user_id, attempt_status="in_progress"
             )
-            self.db.add(active_result)
+            self.db.add(active_attempt)
             self.db.flush()
 
         is_correct = None
-        q_type = question.question_type
-
-        if q_type != "essay":
-            is_correct = self._grade_logic(q_type, question.correct_answer, user_answer)
+        if question.question_type != "essay":
+            is_correct = self._grade_logic(
+                question.question_type, question.correct_answer, user_answer
+            )
 
         progress = (
             self.db.query(QuizProgress)
             .filter(
-                QuizProgress.result_id == active_result.id, QuizProgress.question_id == question_id
+                QuizProgress.attempt_id == active_attempt.id,
+                QuizProgress.question_id == question_id,
             )
             .first()
         )
-
         if progress:
             progress.user_answer = user_answer
             progress.is_correct = is_correct
         else:
             progress = QuizProgress(
-                result_id=active_result.id,
+                attempt_id=active_attempt.id,
                 user_id=user_id,
                 question_id=question_id,
                 user_answer=user_answer,
@@ -219,34 +493,37 @@ class QuizService:
         }
 
     def submit_entire_quiz(
-        self, quiz_id: int, user_id: int, answers_payload: List[Dict[str, Any]], submit_reason: str
+        self,
+        quiz_id: int,
+        user_id: int,
+        answers_payload: List[Dict[str, Any]],
+        submit_reason: str,
     ) -> Dict[str, Any]:
         quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz or quiz.user_id != user_id:
             raise QuizNotFoundError()
-
         if quiz.mode != "exam":
             raise InvalidQuizOperationError(
-                "Chế độ nộp bài tổng hợp chỉ áp dụng cho chế độ thi cử."
+                "Chế độ nộp bài tổng hợp chỉ áp dụng cho chế độ kiểm tra."
             )
 
-        questions = self.db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz_id).all()
+        questions = (
+            self.db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz_id).all()
+        )
         answers_by_qid = {
             item.get("question_id"): item.get("user_answer") for item in answers_payload
         }
 
         total_score = 0.0
         correct_count = 0
-        total_questions = len(questions)
-        max_possible_points = sum(q.points for q in questions if q.question_type != "essay")
 
-        quiz_result = QuizResult(
+        quiz_attempt = QuizAttempt(
             quiz_id=quiz_id,
             user_id=user_id,
             attempt_status="completed",
             submit_reason=submit_reason,
         )
-        self.db.add(quiz_result)
+        self.db.add(quiz_attempt)
         self.db.flush()
 
         response_details = []
@@ -254,12 +531,13 @@ class QuizService:
         for question in questions:
             q_id = question.id
             u_ans = answers_by_qid.get(q_id)
-            q_type = question.question_type
             is_correct = None
 
-            if q_type != "essay":
+            if question.question_type != "essay":  # Hiện tại chưa có AI chấm essay
                 is_correct = (
-                    self._grade_logic(q_type, question.correct_answer, u_ans)
+                    self._grade_logic(
+                        question.question_type, question.correct_answer, u_ans
+                    )
                     if u_ans is not None
                     else False
                 )
@@ -268,7 +546,7 @@ class QuizService:
                     total_score += float(question.points)
 
             progress = QuizProgress(
-                result_id=quiz_result.id,
+                attempt_id=quiz_attempt.id,
                 user_id=user_id,
                 question_id=q_id,
                 user_answer=u_ans,
@@ -286,16 +564,20 @@ class QuizService:
                 }
             )
 
-        quiz_result.score = (
-            (total_score / max_possible_points * 100) if max_possible_points > 0 else 0.0
-        )
+        quiz_attempt.score = total_score
         self.db.commit()
 
+        gradable_max = quiz.target_total_points - sum(
+            q.points for q in questions if q.question_type == "essay"
+        )
+
         return {
-            "result_id": quiz_result.id,
-            "score": quiz_result.score,
+            "attempt_id": quiz_attempt.id,
+            "score": total_score,
+            "score_scale": quiz.target_total_points,
+            "gradable_max": gradable_max,  # điểm tối đa của phần đã chấm được (hiện tạiloại trừ essay)
             "correct_answers_count": correct_count,
-            "total_questions": total_questions,
+            "total_questions": len(questions),
             "submit_reason": submit_reason,
             "details": response_details,
         }
@@ -305,28 +587,21 @@ class QuizService:
         if not quiz or quiz.user_id != user_id:
             raise QuizNotFoundError()
 
-        active_result = (
-            self.db.query(QuizResult)
+        active_attempt = (
+            self.db.query(QuizAttempt)
             .filter(
-                QuizResult.quiz_id == quiz_id,
-                QuizResult.user_id == user_id,
-                QuizResult.attempt_status == "in_progress",
+                QuizAttempt.quiz_id == quiz_id,
+                QuizAttempt.user_id == user_id,
+                QuizAttempt.attempt_status == "in_progress",
             )
             .first()
         )
-
-        if active_result:
-            self.db.query(QuizProgress).filter(QuizProgress.result_id == active_result.id).delete()
-            self.db.delete(active_result)
+        if active_attempt:
+            self.db.query(QuizProgress).filter(
+                QuizProgress.attempt_id == active_attempt.id
+            ).delete()
+            self.db.delete(active_attempt)
             self.db.commit()
-
-    def get_user_quiz_history(
-        self, user_id: int, document_id: Optional[int] = None
-    ) -> List[QuizResult]:
-        query = self.db.query(QuizResult).filter(QuizResult.user_id == user_id)
-        if document_id:
-            query = query.join(Quiz).filter(Quiz.document_id == document_id)
-        return query.order_by(desc(QuizResult.created_at)).all()
 
     def _grade_logic(self, question_type: str, correct_val: Any, user_val: Any) -> bool:
         if user_val is None:
