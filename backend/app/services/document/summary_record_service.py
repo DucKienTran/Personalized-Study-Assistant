@@ -26,7 +26,7 @@ class SummaryRecordService:
         summary_text: str,
         config: dict,
     ) -> dict[str, Any]:
-        """        
+        """
         Lưu một bản tóm tắt mới.
         """
         document = (
@@ -117,7 +117,9 @@ class SummaryRecordService:
         Nếu không truyền: Lấy toàn bộ lịch sử tóm tắt của User theo thứ tự thời gian mới nhất lên đầu.
         """
         query = (
-            self.sql_db.query(DocumentSummary).join(Document).filter(Document.user_id == user_id)
+            self.sql_db.query(DocumentSummary)
+            .join(Document)
+            .filter(Document.user_id == user_id)
         )
 
         if document_id:

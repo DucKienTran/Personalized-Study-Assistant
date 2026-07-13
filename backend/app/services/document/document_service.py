@@ -1,10 +1,15 @@
 from datetime import UTC, datetime
+from typing import Optional
 
-from fastapi import HTTPException, status
+from bson import ObjectId
+from pathlib import Path
 from sqlalchemy.orm import Session
 
+from app.exceptions.base import BadRequestError
 from app.models.document_model import Document
 from app.services.document.parser import DocumentParserService
+
+SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
 
 
 class DocumentService:
@@ -32,14 +37,14 @@ class DocumentService:
     async def upload_and_process_document(
         self, file_bytes: bytes, filename: str, user_id: int
     ):
-        if not filename.lower().endswith(".pdf"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Hệ thống chỉ hỗ trợ xử lý tài liệu định dạng PDF.",
-            )
+        extension = Path(filename).suffix.lower()
 
-        total_pages, extracted_text = self.parser_service._extract_text_sync(
-            file_bytes, filename
+        if extension not in SUPPORTED_EXTENSIONS:
+            raise BadRequestError("Hệ thống hiện chỉ hỗ trợ PDF và DOCX.")
+
+        total_pages, extracted_text = self.parser_service._parse_document_sync(
+            file_bytes,
+            filename,
         )
         final_title = self._get_unique_title(user_id, filename)
 
@@ -58,7 +63,7 @@ class DocumentService:
             user_id=user_id,
             title=final_title,
             file_path="chua_co_storage",
-            file_type="pdf",
+            file_type=extension.lstrip("."),
             mongo_id=str(mongo_result.inserted_id),
             status="pending",
         )
@@ -85,6 +90,38 @@ class DocumentService:
         return (
             query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
         )
+
+    async def get_document_content(
+        self,
+        document_id: int,
+        user_id: int,
+    ) -> Optional[dict]:
+
+        document = (
+            self.sql_db.query(Document)
+            .filter(
+                Document.id == document_id,
+                Document.user_id == user_id,
+            )
+            .first()
+        )
+
+        if document is None:
+            return None
+
+        mongo_doc = await self.mongo_collection.find_one(
+            {"_id": ObjectId(document.mongo_id)}
+        )
+
+        if mongo_doc is None:
+            return None
+
+        return {
+            "title": document.title,
+            "file_type": document.file_type,
+            "total_pages": mongo_doc["total_pages"],
+            "content_raw": mongo_doc["content_raw"],
+        }
 
     async def delete_document(self, document_id: int, user_id: int) -> bool:
         doc = (

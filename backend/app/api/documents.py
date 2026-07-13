@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any, Dict
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
@@ -10,7 +10,7 @@ from app.core.dependencies import (
     SummaryServiceDep,
     get_current_user,
 )
-from app.schemas.document_schema import DocumentOut
+from app.schemas.document_schema import DocumentOut, DocumentContentOut
 from app.schemas.response_schema import BaseResponse
 from app.schemas.summary_schema import (
     OverwriteSummaryRequest,
@@ -56,7 +56,9 @@ async def summarize_document(
     summary_service: SummaryServiceDep,
     current_user: CurrentUserDep,
 ):
-    doc_record = doc_service.get_documents(current_user.id, document_id=payload.document_id)
+    doc_record = doc_service.get_documents(
+        current_user.id, document_id=payload.document_id
+    )
     if not doc_record or not doc_record.mongo_id:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
 
@@ -69,7 +71,9 @@ async def summarize_document(
     return BaseResponse(data={"summary_text": summary_result})
 
 
-@router.post("/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse)
+@router.post(
+    "/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse
+)
 async def save_summary(
     payload: SaveSummaryRequest,
     summary_record_service: SummaryRecordServiceDep,
@@ -142,7 +146,9 @@ async def get_summary_detail(
     return BaseResponse(data=detail)
 
 
-@router.get("/", status_code=status.HTTP_200_OK, response_model=BaseResponse[list[DocumentOut]])
+@router.get(
+    "/", status_code=status.HTTP_200_OK, response_model=BaseResponse[list[DocumentOut]]
+)
 async def get_documents(
     doc_service: DocumentServiceDep,
     current_user: CurrentUserDep,
@@ -151,7 +157,9 @@ async def get_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, le=100),
 ):
-    docs = doc_service.get_documents(current_user.id, skip, limit, status_filter, document_id)
+    docs = doc_service.get_documents(
+        current_user.id, skip, limit, status_filter, document_id
+    )
     if document_id and not docs:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
 
@@ -160,7 +168,32 @@ async def get_documents(
     return BaseResponse(data=docs)
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_200_OK, response_model=BaseResponse)
+@router.get(
+    "/{document_id}/content",
+    response_model=BaseResponse[DocumentContentOut],
+)
+async def get_document_raw_content(
+    document_id: int,
+    current_user: CurrentUserDep,
+    document_service: DocumentServiceDep,
+):
+    content = await document_service.get_document_content(
+        document_id=document_id,
+        user_id=current_user.id,
+    )
+
+    if content is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy tài liệu",
+        )
+
+    return BaseResponse(data=DocumentContentOut.model_validate(content))
+
+
+@router.delete(
+    "/{document_id}", status_code=status.HTTP_200_OK, response_model=BaseResponse
+)
 async def delete_document(
     document_id: int,
     doc_service: DocumentServiceDep,
