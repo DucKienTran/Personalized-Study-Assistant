@@ -33,8 +33,9 @@ class QuizService:
         time_limit_minutes: Optional[int],  # only for exam
         target_total_points: int,  # only for custom gen mode
         generation_mode: str,  # simple | custome
-        difficulty: Optional[str],  # easy | medium | hard | mix
+        difficulty: Optional[str],  # easy | medium | hard | mixed
         custom_instruction: Optional[str],
+        total_questions: int,
     ) -> Quiz:
 
         # Kiểm tra tài liệu có thuộc user này không
@@ -54,6 +55,7 @@ class QuizService:
             generation_mode=generation_mode,
             difficulty=difficulty,
             custom_instruction=custom_instruction,
+            total_questions=total_questions,
             generation_status="processing",
         )
         self.db.add(quiz)
@@ -215,21 +217,51 @@ class QuizService:
 
         for q in questions:
             user_progress = progress_map.get(q.id)
+
+            # Chuẩn hóa danh sách options
+            formatted_options = None
+            if q.options and isinstance(q.options, list):
+                formatted_options = []
+                for idx, opt in enumerate(q.options):
+                    if isinstance(opt, str):
+                        if "." in opt:
+                            parts = opt.split(".", 1)
+                            opt_id = parts[0].strip()
+                            opt_text = parts[1].strip()
+                        else:
+                            opt_id = chr(65 + idx)
+                            opt_text = opt
+
+                        formatted_options.append(
+                            {"id": opt_id, "text": opt_text, "option_text": opt}
+                        )
+                    elif isinstance(opt, dict):
+                        if "id" not in opt:
+                            opt["id"] = opt.get("key") or chr(65 + idx)
+                        formatted_options.append(opt)
+
             q_dict = {
                 "id": q.id,
                 "question_text": q.question_text,
                 "question_type": q.question_type,
-                "options": q.options,
+                "options": formatted_options,
                 "points": q.points,
                 "hint": q.hint,
+                # Lấy câu trả lời đã lưu trong DB (nếu có) để khôi phục khi F5
                 "user_answer": user_progress.user_answer if user_progress else None,
             }
 
-            if quiz.mode == "study" and user_progress:
+            # Chế độ học tập (study): Luôn hiển thị giải thích và đáp án chuẩn
+            if quiz.mode == "study":
                 q_dict["correct_answer"] = q.correct_answer
                 q_dict["explanations"] = q.explanations
-                q_dict["is_correct"] = user_progress.is_correct
-                q_dict["ai_feedback"] = user_progress.ai_feedback
+                # Khôi phục trạng thái đúng/sai đã chấm trước đó khi tải lại trang
+                q_dict["is_correct"] = (
+                    user_progress.is_correct if user_progress else None
+                )
+                q_dict["ai_feedback"] = (
+                    user_progress.ai_feedback if user_progress else None
+                )
 
             quiz_data["questions"].append(q_dict)
 
@@ -276,6 +308,8 @@ class QuizService:
                     "document_id": quiz.document_id,
                     "title": quiz.title,
                     "mode": quiz.mode,
+                    "total_questions": quiz.total_questions,
+                    "difficulty": quiz.difficulty,
                     "generation_status": quiz.generation_status,
                     "derived_status": derived_status,
                     "error_message": quiz.error_message,
@@ -330,13 +364,47 @@ class QuizService:
         )
 
         question_details = []
+
         for q in questions:
             p = progress_map.get(q.id)
+
+            # Chuẩn hóa options
+            formatted_options = None
+            if q.options and isinstance(q.options, list):
+                formatted_options = []
+
+                for idx, opt in enumerate(q.options):
+                    if isinstance(opt, str):
+                        if "." in opt:
+                            parts = opt.split(".", 1)
+                            opt_id = parts[0].strip()
+                            opt_text = parts[1].strip()
+                        else:
+                            opt_id = chr(65 + idx)
+                            opt_text = opt
+
+                        formatted_options.append(
+                            {
+                                "id": opt_id,
+                                "text": opt_text,
+                                "option_text": opt,
+                            }
+                        )
+
+                    elif isinstance(opt, dict):
+                        option = opt.copy()
+
+                        if "id" not in option:
+                            option["id"] = option.get("key") or chr(65 + idx)
+
+                        formatted_options.append(option)
+
             question_details.append(
                 {
                     "question_id": q.id,
                     "question_text": q.question_text,
                     "question_type": q.question_type,
+                    "options": formatted_options,   # <-- thêm dòng này
                     "correct_answer": q.correct_answer,
                     "explanations": q.explanations,
                     "points": q.points,
@@ -379,7 +447,7 @@ class QuizService:
             .filter(
                 QuizQuestion.quiz_id == quiz_id,
             )
-            .order_by(QuizQuestion.order_index)
+            .order_by(QuizQuestion.id)
             .all()
         )
 
@@ -607,15 +675,23 @@ class QuizService:
         if user_val is None:
             return False
 
+        # Hàm helper dùng chung để chuẩn hóa phương án (ví dụ: "A. static" -> "a")
+        def clean_option(val: Any) -> str:
+            return str(val).strip().split(".")[0].strip().lower()
+
         if question_type == "multiple_choice":
-            return str(correct_val).strip().lower() == str(user_val).strip().lower()
+            return clean_option(correct_val) == clean_option(user_val)
 
         elif question_type == "multiple_response":
-            if not isinstance(correct_val, list) or not isinstance(user_val, list):
-                return False
-            return set(str(x).strip().lower() for x in correct_val) == set(
-                str(x).strip().lower() for x in user_val
-            )
+            # Đảm bảo cả đáp án đúng và đáp án chọn đều là list
+            c_list = correct_val if isinstance(correct_val, list) else [correct_val]
+            u_list = user_val if isinstance(user_val, list) else [user_val]
+
+            # Làm sạch toàn bộ phần tử trong cả 2 list để đối chiếu không lệch nhãn đầu câu
+            set_correct = set(clean_option(x) for x in c_list if x is not None)
+            set_user = set(clean_option(x) for x in u_list if x is not None)
+
+            return set_correct == set_user
 
         elif question_type == "true_false":
 

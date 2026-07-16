@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -12,13 +12,13 @@ class QuizGenerateRequest(BaseModel):
     total_questions: int = Field(default=10, ge=1, le=50)
     question_types: List[str] = Field(default_factory=lambda: ["multiple_choice"])
     difficulty: Optional[str] = (
-        None  # dùng ở cả simple lẫn custom; None -> "medium" mặc định
+        None  # Đặt "medium" mặc định
     )
     custom_instruction: Optional[str] = (
         None  # chỉ có tác dụng khi generation_mode="custom"
     )
 
-    target_total_points: int = Field(default=100, ge=1)
+    target_total_points: Optional[float] = None
     time_limit_minutes: Optional[int] = None  # bắt buộc nếu mode="exam"
 
     @model_validator(mode="after")

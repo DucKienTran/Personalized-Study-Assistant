@@ -109,6 +109,12 @@ class QuizQuestionSchema(BaseModel):
             else:
                 self.correct_answer = str(ans).strip()
 
+            if len(self.correct_answer) > 4:
+                raise ValueError(
+                    f"Câu '{self.question_text[:20]}...': short_answer correct_answer "
+                    f"'{self.correct_answer}' dài {len(self.correct_answer)} ký tự, vượt quá giới hạn 4."
+                )
+
         elif q_type == "essay":
             pass
 

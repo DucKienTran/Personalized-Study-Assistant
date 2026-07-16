@@ -51,6 +51,7 @@ async def generate_quiz(
         generation_mode=req.generation_mode,
         difficulty=req.difficulty,
         custom_instruction=req.custom_instruction,
+        total_questions=req.total_questions,
     )
     background_tasks.add_task(
         quiz_service.run_generation, quiz.id, req.question_types, req.total_questions

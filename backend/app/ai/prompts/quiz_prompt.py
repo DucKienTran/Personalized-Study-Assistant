@@ -86,6 +86,11 @@ Mỗi object câu hỏi PHẢI có đúng các field sau, tuỳ theo question_ty
   "points": 3,
   "hint": "..."
 }
+LƯU Ý: correct_answer PHẢI có độ dài TỐI ĐA 4 ký tự (tính cả dấu trừ và dấu thập phân
+nếu có). Chỉ được sinh câu hỏi short_answer nếu đáp án đúng có thể biểu diễn gọn (kể cả 
+kết quả chính xác hay làm tròn) trong 4 ký tự (ví dụ: "12", "-5", "3.14", "0.5"). 
+KHÔNG sinh short_answer nếu đáp án tự nhiêndài hơn — trong trường hợp đó, đổi câu hỏi sang 
+dạng khác (fill_blank/multiple_choice/...) hoặc bỏ câu đó.
 
 6. "essay":
 {

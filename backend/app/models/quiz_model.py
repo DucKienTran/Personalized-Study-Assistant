@@ -38,7 +38,7 @@ class Quiz(Base):
     mode = Column(
         String(20), nullable=False, default="study", server_default="study"
     )  # "study" | "exam"
-
+    total_questions = Column(Integer, nullable=False, default=10)
     target_total_points = Column(
         Integer, nullable=False, default=100, server_default="100"
     )
