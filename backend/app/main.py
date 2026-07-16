@@ -105,11 +105,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(auth_router, prefix=settings.API_V1_STR)
-app.include_router(users_router, prefix=settings.API_V1_STR)
-app.include_router(documents_router, prefix=settings.API_V1_STR)
-app.include_router(quizzes_router, prefix=settings.API_V1_STR)
-app.include_router(quiz_attempts_router, prefix=settings.API_V1_STR)
+app.include_router(auth_router, prefix=settings.API_STR)
+app.include_router(users_router, prefix=settings.API_STR)
+app.include_router(documents_router, prefix=settings.API_STR)
+app.include_router(quizzes_router, prefix=settings.API_STR)
+app.include_router(quiz_attempts_router, prefix=settings.API_STR)
 
 
 @app.get("/")

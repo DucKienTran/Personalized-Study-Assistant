@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     )
 
     PROJECT_NAME: str = "LearningAId"
-    API_V1_STR: str = "/api/v1"
+    API_STR: str = "/api"
 
     # Secret
     GEMINI_API_KEY: str
