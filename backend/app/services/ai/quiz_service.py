@@ -404,7 +404,7 @@ class QuizService:
                     "question_id": q.id,
                     "question_text": q.question_text,
                     "question_type": q.question_type,
-                    "options": formatted_options,   # <-- thêm dòng này
+                    "options": formatted_options,  # <-- thêm dòng này
                     "correct_answer": q.correct_answer,
                     "explanations": q.explanations,
                     "points": q.points,

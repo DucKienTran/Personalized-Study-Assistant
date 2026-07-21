@@ -11,9 +11,7 @@ class QuizGenerateRequest(BaseModel):
 
     total_questions: int = Field(default=10, ge=1, le=50)
     question_types: List[str] = Field(default_factory=lambda: ["multiple_choice"])
-    difficulty: Optional[str] = (
-        None  # Đặt "medium" mặc định
-    )
+    difficulty: Optional[str] = None  # Đặt "medium" mặc định
     custom_instruction: Optional[str] = (
         None  # chỉ có tác dụng khi generation_mode="custom"
     )

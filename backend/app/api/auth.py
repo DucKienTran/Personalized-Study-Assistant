@@ -63,7 +63,7 @@ async def refresh_token(
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout_user(
     response: Response,
-    service: AuthServiceDep,    
+    service: AuthServiceDep,
     refresh_token: str = Cookie(None),
 ):
     result = await service.logout(refresh_token)
