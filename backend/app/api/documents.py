@@ -1,16 +1,26 @@
-from typing import Optional, Any, Dict
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 
 from app.core.dependencies import (
     CurrentUserDep,
+    DocumentProcessingServiceDep,
     DocumentServiceDep,
     SummaryRecordServiceDep,
     SummaryServiceDep,
     get_current_user,
 )
-from app.schemas.document_schema import DocumentOut, DocumentContentOut
+from app.schemas.document_schema import DocumentContentOut, DocumentOut
 from app.schemas.response_schema import BaseResponse
 from app.schemas.summary_schema import (
     OverwriteSummaryRequest,
@@ -38,15 +48,29 @@ class SummarizeRequest(BaseModel):
     response_model=BaseResponse[DocumentOut],
 )
 async def upload_and_process_document(
+    background_tasks: BackgroundTasks,
     doc_service: DocumentServiceDep,
+    processing_service: DocumentProcessingServiceDep,
     current_user: CurrentUserDep,
     file: UploadFile = File(...),
 ):
     file_bytes = await file.read()
-    new_doc = await doc_service.upload_and_process_document(
+
+    new_doc = await doc_service.upload_and_init_document(
         file_bytes=file_bytes, filename=file.filename, user_id=current_user.id
     )
-    return BaseResponse(message="Đã đọc và lưu trữ tài liệu thành công.", data=new_doc)
+
+    background_tasks.add_task(
+        processing_service.execute_processing_pipeline,
+        document_id=new_doc.id,
+        mongo_id=new_doc.mongo_id,
+        object_name=new_doc.file_path,
+    )
+
+    return BaseResponse(
+        message="Tài liệu đã được tải lên thành công. Tiến trình phân tích cấu trúc đang được xử lý tự động.",
+        data=new_doc,
+    )
 
 
 @router.post("/summarize", status_code=status.HTTP_200_OK, response_model=BaseResponse)
@@ -56,9 +80,7 @@ async def summarize_document(
     summary_service: SummaryServiceDep,
     current_user: CurrentUserDep,
 ):
-    doc_record = doc_service.get_documents(
-        current_user.id, document_id=payload.document_id
-    )
+    doc_record = doc_service.get_documents(current_user.id, document_id=payload.document_id)
     if not doc_record or not doc_record.mongo_id:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
 
@@ -71,9 +93,7 @@ async def summarize_document(
     return BaseResponse(data={"summary_text": summary_result})
 
 
-@router.post(
-    "/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse
-)
+@router.post("/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse)
 async def save_summary(
     payload: SaveSummaryRequest,
     summary_record_service: SummaryRecordServiceDep,
@@ -146,9 +166,7 @@ async def get_summary_detail(
     return BaseResponse(data=detail)
 
 
-@router.get(
-    "/", status_code=status.HTTP_200_OK, response_model=BaseResponse[list[DocumentOut]]
-)
+@router.get("/", status_code=status.HTTP_200_OK, response_model=BaseResponse[list[DocumentOut]])
 async def get_documents(
     doc_service: DocumentServiceDep,
     current_user: CurrentUserDep,
@@ -157,9 +175,7 @@ async def get_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, le=100),
 ):
-    docs = doc_service.get_documents(
-        current_user.id, skip, limit, status_filter, document_id
-    )
+    docs = doc_service.get_documents(current_user.id, skip, limit, status_filter, document_id)
     if document_id and not docs:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
 
@@ -191,9 +207,7 @@ async def get_document_raw_content(
     return BaseResponse(data=DocumentContentOut.model_validate(content))
 
 
-@router.delete(
-    "/{document_id}", status_code=status.HTTP_200_OK, response_model=BaseResponse
-)
+@router.delete("/{document_id}", status_code=status.HTTP_200_OK, response_model=BaseResponse)
 async def delete_document(
     document_id: int,
     doc_service: DocumentServiceDep,

@@ -27,11 +27,11 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
-    # Cấu hình Redis
+    # Redis Config
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
-    # Cấu hình MongoDB
+    # MongoDB Config
     MONGODB_HOST: str = "localhost"
     MONGODB_PORT: int = 27017
     MONGODB_NAME: str
@@ -39,6 +39,19 @@ class Settings(BaseSettings):
     @property
     def MONGODB_URL(self) -> str:
         return f"mongodb://{self.MONGODB_HOST}:{self.MONGODB_PORT}"
+
+    # MinIO Config
+    MINIO_HOST: str = "localhost"
+    MINIO_PORT: int = 9000
+
+    @property
+    def MINIO_ENDPOINT(self) -> str:
+        return f"{self.MINIO_HOST}:{self.MINIO_PORT}"
+    MINIO_ACCESS_KEY: str
+    MINIO_SECRET_KEY: str
+    MINIO_BUCKET: str = "documents"
+    MINIO_SECURE: bool = False
+
 
     # Token & Security Config
     JWT_ALGORITHM: str = "HS256"

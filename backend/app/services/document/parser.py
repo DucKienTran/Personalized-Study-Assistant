@@ -1,135 +1,141 @@
 import asyncio
-from datetime import UTC, datetime
+from dataclasses import dataclass
 import logging
 from pathlib import Path
-from io import BytesIO
 
 from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 import fitz
+import pymupdf4llm
 
 from app.exceptions import AppError, BadRequestError, InternalServerError
+from app.storage.base import StorageService
 
 logger = logging.getLogger(__name__)
+CHARS_PER_PAGE = 3000  # Ngưỡng ước lượng số ký tự trên một trang A4 fluid
 
-PDF_PAGE_LIMIT = 15
 
-PDF_LIMIT_MESSAGE = (
-    "Tài khoản hiện tại chỉ cho phép xử lý tối đa 15 trang. "
-    "Vui lòng nâng cấp PRO để xử lý file lớn hơn."
-)
+@dataclass(slots=True)
+class ParsedDocument:
+    markdown: str
+    total_pages: int
 
 
 class DocumentParserService:
-    def __init__(self, mongo_db):
-        self.db = mongo_db
-        self.collection = self.db["parsed_documents"]
+    async def parse_document(
+        self,
+        object_name: str,
+        storage_service: StorageService,
+    ) -> ParsedDocument:
+        temp_path = await storage_service.download_temp_file(object_name)
+        try:
+            return await asyncio.to_thread(self._parse_sync, temp_path)
+        except AppError:
+            raise
+        except Exception:
+            logger.exception("[Parser] Failed to parse document: %s", object_name)
+            raise InternalServerError("Failed to parse the uploaded document.")
+        finally:
+            await storage_service.delete_temp_file(temp_path)
 
-    def _extract_pdf(self, file_bytes: bytes) -> tuple[int, str]:
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+    def _parse_sync(self, file_path: str) -> ParsedDocument:
+        extension = Path(file_path).suffix.lower()
+        if extension == ".pdf":
+            return self._parse_pdf(file_path)
+        if extension == ".docx":
+            return self._parse_docx(file_path)
+        raise BadRequestError("Only PDF and DOCX documents are currently supported.")
 
+    def _parse_pdf(self, pdf_path: str) -> ParsedDocument:
+        doc = fitz.open(pdf_path)
         try:
             total_pages = len(doc)
-
-            if total_pages > PDF_PAGE_LIMIT:
-                raise BadRequestError(PDF_LIMIT_MESSAGE)
-
-            extracted_text = ""
-
-            for page_num, page in enumerate(doc):
-                extracted_text += f"\n--- Trang {page_num + 1} ---\n"
-                extracted_text += page.get_text()
-
-            return total_pages, extracted_text
-
         finally:
             doc.close()
 
-    def _extract_docx(self, file_bytes: bytes) -> tuple[int, str]:
-        doc = Document(BytesIO(file_bytes))
+        pages = pymupdf4llm.to_markdown(pdf_path, page_chunks=True)
 
-        paragraphs = []
+        if not pages:
+            raise BadRequestError("Unable to extract text from the PDF document.")
 
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            if text:
-                paragraphs.append(text)
-
-        extracted_text = "\n\n".join(paragraphs)
-
-        # DOCX không có khái niệm page cố định
-        total_pages = 1
-
-        return total_pages, extracted_text
-
-    def _extract_pdf_scan(self, file_bytes: bytes) -> tuple[int, str]:
-        """
-        TODO:
-        OCR cho PDF Scan.
-
-        Có thể dùng:
-        - Tesseract
-        - PaddleOCR
-        - Gemini OCR
-
-        Hàm này sẽ được gọi nếu PDF không trích xuất được text.
-        """
-        raise BadRequestError("PDF Scan hiện chưa được hỗ trợ.")
-
-    def _parse_document_sync(
-        self,
-        file_bytes: bytes,
-        filename: str,
-    ) -> tuple[int, str]:
-        extension = Path(filename).suffix.lower()
-
-        if extension == ".pdf":
-            return self._extract_pdf(file_bytes)
-
-        if extension == ".docx":
-            return self._extract_docx(file_bytes)
-
-        raise BadRequestError("Hệ thống hiện chỉ hỗ trợ PDF.")
-
-    async def parse_document(
-        self,
-        file_bytes: bytes,
-        filename: str,
-    ):
-        """
-        Parse tài liệu và lưu MongoDB.
-        """
-
-        try:
-            logger.info(f"[Parser] Bắt đầu xử lý file: {filename}")
-
-            total_pages, extracted_text = await asyncio.to_thread(
-                self._parse_document_sync,
-                file_bytes,
-                filename,
+        md_metadata = pages[0].get("metadata", {})
+        if "page" not in md_metadata and "page_number" not in md_metadata:
+            logger.warning(
+                "[Parser] pymupdf4llm metadata keys: %s — page marker sẽ bị bỏ qua",
+                list(md_metadata.keys()),
             )
 
-            document_data = {
-                "title": filename,
-                "total_pages": total_pages,
-                "content_raw": extracted_text,
-                "status": "parsed",
-                "created_at": datetime.now(UTC),
-            }
+        parts = []
+        for p in pages:
+            meta = p.get("metadata", {})
+            # Thư viện trả về index từ 0, ta cộng 1 để ra số trang thực tế của con người (1, 2, 3...)
+            raw_page = meta.get("page", meta.get("page_number"))
+            page_num = raw_page if raw_page is not None else None
+            
+            marker = f"<!--page:{page_num}-->\n" if page_num is not None else ""
+            parts.append(f"{marker}{p['text']}")
 
-            result = await self.collection.insert_one(document_data)
+        markdown = "".join(parts)
 
-            logger.info(f"[Parser] Đã lưu MongoDB thành công. ID={result.inserted_id}")
+        if not markdown.strip():
+            raise BadRequestError("Unable to extract text from the PDF document.")
 
-            return {
-                "document_id": str(result.inserted_id),
-                "title": filename,
-                "pages": total_pages,
-                "status": "parsed",
-            }
+        return ParsedDocument(markdown=markdown, total_pages=total_pages)
 
-        except AppError:
-            raise
+    def _parse_docx(self, docx_path: str) -> ParsedDocument:
+        document = Document(docx_path)
+        markdown_lines: list[str] = []
+        
+        current_page = 1
+        accumulated_chars = 0
 
-        except Exception:
-            logger.exception(f"[Parser] Lỗi khi xử lý file {filename}")
-            raise InternalServerError("Lỗi trích xuất dữ liệu tài liệu.")
+        # Bơm marker trang 1 vào ngay đầu file DOCX
+        markdown_lines.append(f"<!--page:{current_page}-->")
+
+        # Duyệt qua các phần tử để đảm bảo giữ nguyên thứ tự xuất hiện trong file
+        for child in document.element.body:
+            element_text = ""
+            
+            if child.tag.endswith("p"):
+                paragraph = Paragraph(child, document)
+                text = paragraph.text.strip()
+                if not text:
+                    continue
+
+                style = paragraph.style.name.lower().strip() if paragraph.style else ""
+                if style.startswith("heading 1"):
+                    element_text = f"# {text}\n"
+                elif style.startswith("heading 2"):
+                    element_text = f"## {text}\n"
+                elif style.startswith("heading 3"):
+                    element_text = f"### {text}\n"
+                elif style.startswith("heading 4"):
+                    element_text = f"#### {text}\n"
+                else:
+                    element_text = f"{text}\n"
+
+            elif child.tag.endswith("tbl"):
+                table = Table(child, document)
+                table_lines = []
+                for i, row in enumerate(table.rows):
+                    row_text = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+                    table_lines.append("| " + " | ".join(row_text) + " |")
+                    if i == 0:
+                        table_lines.append("| " + " | ".join(["---"] * len(row.cells)) + " |")
+                element_text = "\n".join(table_lines) + "\n"
+
+            if element_text:
+                markdown_lines.append(element_text)
+                accumulated_chars += len(element_text)
+                
+                if accumulated_chars >= CHARS_PER_PAGE:
+                    current_page += 1
+                    markdown_lines.append(f"<!--page:{current_page}-->")
+                    accumulated_chars = 0
+
+        markdown = "\n".join(markdown_lines)
+        if not markdown.strip():
+            raise BadRequestError("Unable to extract text from the DOCX document.")
+
+        return ParsedDocument(markdown=markdown, total_pages=current_page)
