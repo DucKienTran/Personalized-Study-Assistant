@@ -1,40 +1,50 @@
+import voyageai
 import time
 
-from google import genai
+API_KEY = "pa-Dr7mNFpmrgrp1_B_fMlwGbYjuAlLKmKaZTDex-_I6LL"
 
-API_KEY_1 = ""
-API_KEY_2 = ""
+client = voyageai.Client(api_key=API_KEY)
 
-MODEL = "gemini-2.5-flash"
-PROMPT = "Say 'Hello' in one short sentence."
+success = 0
+failed = 0
 
+start = time.time()
 
-def test_api_key(name, api_key):
-    print(f"\n===== Testing {name} =====")
+print("Starting stress test...")
+print("-" * 60)
 
+while True:
     try:
-        client = genai.Client(api_key=api_key)
-
-        start = time.perf_counter()
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=PROMPT,
+        client.embed(
+            ["Hello world"],
+            model="voyage-4-lite",
+            input_type="document",
         )
 
-        elapsed = time.perf_counter() - start
+        success += 1
 
-        print("✅ Success")
-        print(f"Time: {elapsed:.2f} s")
-        print("Response:")
-        print(response.text)
+        if success % 10 == 0:
+            elapsed = time.time() - start
+            print(
+                f"Success: {success:5d} | "
+                f"Elapsed: {elapsed:.2f}s | "
+                f"RPS: {success/elapsed:.2f}"
+            )
 
     except Exception as e:
-        print("❌ Failed")
-        print(type(e).__name__)
+        elapsed = time.time() - start
+
+        print("\n" + "=" * 60)
+        print("Stopped!")
+        print("=" * 60)
+        print(f"Exception: {type(e).__name__}")
         print(e)
 
+        print()
+        print(f"Successful requests : {success}")
+        print(f"Failed requests     : {failed + 1}")
+        print(f"Elapsed time        : {elapsed:.2f} s")
+        print(f"Average RPS         : {success/elapsed:.2f}")
+        print(f"Average RPM         : {(success/elapsed)*60:.2f}")
 
-if __name__ == "__main__":
-    test_api_key("API KEY 1", API_KEY_1)
-    test_api_key("API KEY 2", API_KEY_2)
+        break

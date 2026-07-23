@@ -12,18 +12,23 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/chroma_storage:/app/chroma_storage
     env_file:
       - ./backend/.env.dev
     environment:
       DB_HOST: db
       REDIS_HOST: redis
       MONGODB_HOST: mongodb
+      MINIO_HOST: minio
+      MINIO_PORT: 9000
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       mongodb:
+        condition: service_started
+      minio:
         condition: service_started
     # command: >
     #   bash -c "
@@ -116,6 +121,22 @@ services:
       - learning_aid_mongodb_data:/data/db
     networks:
       - learning_aid_network
+  # ─── MINIO OBJECT STORAGE SERVICE ───────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: learning_aid_minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - learning_aid_minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - learning_aid_network
 
 # ─── QUẢN LÝ MẠNG VÀ DỮ LIỆU (VOLUMES & NETWORKS) ────────────────────
 networks:
@@ -126,3 +147,4 @@ volumes:
   learning_aid_mysql_data:
   learning_aid_redis_data:
   learning_aid_mongodb_data:
+  learning_aid_minio_data:

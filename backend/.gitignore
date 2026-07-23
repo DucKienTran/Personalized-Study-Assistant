@@ -35,3 +35,4 @@ app.log
 
 # các file uploads
 uploads/
+chroma_storage/

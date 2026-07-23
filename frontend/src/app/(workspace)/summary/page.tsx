@@ -8,9 +8,9 @@ import * as Icons from "@/components/shared/icons";
 
 
 const STATUS_LABEL: Record<string, { text: string; className: string }> = {
-    pending: { text: "Chưa xử lý", className: "bg-gray-100 text-gray-500" },
-    completed: { text: "Đã tóm tắt", className: "bg-blue-50 text-blue-600" },
-    failed: { text: "Lỗi xử lý", className: "bg-red-50 text-red-500" },
+        pending: { text: "Not Processed", className: "bg-gray-100 text-gray-500" },
+    completed: { text: "Summarized", className: "bg-blue-50 text-blue-600" },
+    failed: { text: "Processing Failed", className: "bg-red-50 text-red-500" },
 };
 
 const PickerSkeleton = () => (
@@ -35,7 +35,7 @@ export default function SummaryPickerPage() {
         documentService
             .listDocuments({ limit: 50 })
             .then((data) => { if (mounted) setDocs(data); })
-            .catch(() => { if (mounted) setError("Không tải được danh sách tài liệu. Thử lại sau."); });
+            .catch(() => { if (mounted) setError("Failed to load document list. Please try again later."); });
         return () => { mounted = false; };
     }, []);
 
@@ -47,7 +47,7 @@ export default function SummaryPickerPage() {
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] text-white rounded-lg"
                 >
-                    Thử lại
+                                        Retry
                 </button>
             </div>
         );
@@ -57,9 +57,9 @@ export default function SummaryPickerPage() {
 
     return (
         <div className="max-w-3xl mx-auto space-y-6 pt-4">
-            <div className="space-y-1.5">
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tóm tắt tài liệu</h1>
-                <p className="text-gray-500 text-xs">Chọn một tài liệu để bắt đầu tóm tắt.</p>
+                        <div className="space-y-1.5">
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Summarize Document</h1>
+                <p className="text-gray-500 text-xs">Select a document to start summarizing.</p>
             </div>
 
             {docs.length === 0 ? (

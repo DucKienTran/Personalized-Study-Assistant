@@ -22,7 +22,7 @@ export default function RegisterPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không trùng khớp!");
+      setError("Passwords do not match!");
       return;
     }
 
@@ -44,13 +44,13 @@ export default function RegisterPage() {
 
     } catch (err: any) {
       const errorData = err.response?.data?.detail;
-      setError(Array.isArray(errorData) ? errorData[0]?.msg : errorData || "Đăng ký thất bại, vui lòng thử lại.");
+      setError("Registration failed, please try again.");
       setLoading(false);
     }
   };
 
-  if (showRedirectLoading) {
-    return <RedirectLoading message="Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập..." />;
+    if (showRedirectLoading) {
+    return <RedirectLoading message="Registration successful! Redirecting to login page..." />;
   }
 
   return (
@@ -58,12 +58,12 @@ export default function RegisterPage() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff]">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[#581c87] mb-2">{APP_CONFIG.NAME}</h1>
-          <p className="text-sm text-[#7e22ce]">Tạo tài khoản mới của bạn</p>
+          <p className="text-sm text-[#7e22ce]">Create your new account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Tên đăng nhập </label>
+            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Username </label>
             <input
               type="text"
               required
@@ -80,12 +80,12 @@ export default function RegisterPage() {
           </div>
 
           <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Mật khẩu</label>
+            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Password</label>
             <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]" placeholder="••••••••" />
           </div>
 
           <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Xác nhận mật khẩu</label>
+            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">Confirm password</label>
             <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]" placeholder="••••••••" />
           </div>
 
@@ -97,15 +97,15 @@ export default function RegisterPage() {
 
           <div className="pt-2">
             <button type="submit" disabled={loading} className="w-full py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-[14px] font-semibold rounded-full shadow-sm transition-colors duration-150 disabled:bg-[#cbd5e1]">
-              {loading ? "Đang xử lý..." : "Đăng Ký"}
+              {loading ? "Processing..." : "Register"}
             </button>
           </div>
         </form>
 
         <div className="text-center mt-6 text-[13px] text-[#6b21a8]">
-          Đã có tài khoản?{" "}
+                    Already have an account?{" "}
           <Link href="/login" className="font-semibold text-[#7c3aed] hover:underline">
-            Đăng nhập ngay
+            Log in now
           </Link>
         </div>
       </div>

@@ -77,8 +77,240 @@ export const SaveIcon = ({ className = "w-4 h-4" }: IconProps) => (
     </svg>
 );
 
+export const LightbulbIcon = ({ className = "w-4 h-4" }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.25c-4.142 0-7.5 3.358-7.5 7.5 0 2.26.992 4.288 2.566 5.67A7.478 7.478 0 0 1 10.5 19.5v.75c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75v-.75c1.472-.34 2.766-1.157 3.684-2.33A7.487 7.487 0 0 0 19.5 9.75c0-4.142-3.358-7.5-7.5-7.5Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 22.5h3" />
+    </svg>
+);
+
 export const FilterIcon = ({ className = "w-4 h-4" }: IconProps) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+    </svg>
+);
+
+export const CloseIcon = ({ className = "w-6 h-6" }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+    </svg>
+);
+
+/* ============================================================
+ * Quiz Icons
+ * ========================================================== */
+
+export const MultipleChoiceIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        className={className}
+    >
+        <circle cx="12" cy="12" r="8" />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m9.3 12.1 1.8 1.8L15 10"
+        />
+    </svg>
+);
+
+export const MultipleResponseIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        className={className}
+    >
+        <rect x="4" y="5" width="5" height="5" rx="1" />
+        <rect x="4" y="14" width="5" height="5" rx="1" />
+
+        <path
+            strokeWidth={1.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m5.6 7.7 1.1 1.1L8.4 7"
+        />
+
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m5.6 16.7 1.1 1.1L8.4 16"
+        />
+
+        <path strokeLinecap="round" d="M12 8h8" />
+        <path strokeLinecap="round" d="M12 17h8" />
+    </svg>
+);
+
+export const TrueFalseIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        className={className}
+    >
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m5 11 2 2 4-4"
+        />
+
+        <path
+            strokeLinecap="round"
+            d="M14.5 9.5 19 14"
+        />
+
+        <path
+            strokeLinecap="round"
+            d="M19 9.5 14.5 14"
+        />
+    </svg>
+);
+
+export const FillBlankIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        className={className}
+    >
+        <path strokeLinecap="round" d="M4 8h4" />
+        <path strokeLinecap="round" d="M16 8h4" />
+        <path strokeLinecap="round" d="M7 16h10" />
+    </svg>
+);
+
+export const ShortAnswerIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.7}
+        className={className}
+    >
+        <rect
+            x="3"
+            y="5"
+            width="18"
+            height="14"
+            rx="2.5"
+        />
+
+        {/* A */}
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M7.8 15 9.4 9l1.6 6"
+        />
+
+        <path
+            strokeLinecap="round"
+            d="M8.4 12.8h2"
+        />
+
+        {/* typing area */}
+        <path
+            strokeLinecap="round"
+            d="M14.8 15.2h2.8"
+            opacity=".55"
+        />
+    </svg>
+);
+
+export const CustomQuizIcon = ({
+    className = "w-6 h-6",
+}: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        className={className}
+    >
+        <line
+            x1="4"
+            y1="6"
+            x2="20"
+            y2="6"
+            strokeLinecap="round"
+        />
+
+        <circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none" />
+
+        <line
+            x1="4"
+            y1="12"
+            x2="20"
+            y2="12"
+            strokeLinecap="round"
+        />
+
+        <circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none" />
+
+        <line
+            x1="4"
+            y1="18"
+            x2="20"
+            y2="18"
+            strokeLinecap="round"
+        />
+
+        <circle cx="11" cy="18" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+);
+
+// Chevron Icons cho menu Hướng dẫn
+export const ChevronDownIcon = ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+);
+
+export const ChevronRightIcon = ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+);
+
+// Icon chữ (i) cho độ khó Hỗn hợp
+export const InfoCircleIcon = ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+// Custom Checkbox Icons
+export const CheckedBoxIcon = ({ className }: { className?: string }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    </svg>
+);
+
+export const UncheckedBoxIcon = ({ className }: { className?: string }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth="2"></rect>
     </svg>
 );
