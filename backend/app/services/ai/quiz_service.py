@@ -39,7 +39,7 @@ class QuizService:
     ) -> Quiz:
 
         # Kiểm tra tài liệu có thuộc user này không
-        doc = self.document_service.get_documents(
+        doc = self.document_service.get_document(
             user_id=user_id, document_id=document_id
         )
         if not doc:

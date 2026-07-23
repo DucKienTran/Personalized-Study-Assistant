@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     JWT_SECRET_KEY: str
     ADMIN_REGISTRATION_KEY: str
+    VOYAGE_API_KEY: str
+    VOYAGE_MODEL: str = "voyage-4-lite"
+    VOYAGE_EMBEDDING_BATCH_SIZE: int
 
     # Database MySQL Config
     DB_HOST: str
@@ -47,11 +50,15 @@ class Settings(BaseSettings):
     @property
     def MINIO_ENDPOINT(self) -> str:
         return f"{self.MINIO_HOST}:{self.MINIO_PORT}"
+
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
     MINIO_BUCKET: str = "documents"
     MINIO_SECURE: bool = False
 
+    # ChromaDB Config (embedded mode — chạy trong chính container backend)
+    CHROMA_PERSIST_DIR: str
+    CHROMA_COLLECTION_NAME: str = "learning_aid_chunks"
 
     # Token & Security Config
     JWT_ALGORITHM: str = "HS256"
@@ -64,6 +71,12 @@ class Settings(BaseSettings):
 
     # AI model
     GEMINI_MODEL: str
+
+    # Chunking
+    CHARS_PER_PAGE: str
+
+    # Rag
+    RAG_TOP_K: int = 5
 
 
 settings = Settings()
