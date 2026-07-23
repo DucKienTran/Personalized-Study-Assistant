@@ -36,8 +36,12 @@ export const documentService = {
     },
 
     async getDocument(id: number): Promise<DocumentListItem> {
-        const res = await api.get<ApiResponse<DocumentListItem>>("/documents/", { params: { document_id: id } });
-        return res.data.data;
+        const res = await api.get<ApiResponse<DocumentListItem[]>>(
+            "/documents/",
+            { params: { document_id: id } }
+        );
+
+        return res.data.data[0];
     },
 
     async deleteDocument(id: number): Promise<void> {

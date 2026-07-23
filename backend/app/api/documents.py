@@ -1,16 +1,26 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 
 from app.core.dependencies import (
-    AISummarizerServiceDep,
     CurrentUserDep,
+    DocumentProcessingServiceDep,
     DocumentServiceDep,
-    DocumentSummaryServiceDep,
+    SummaryRecordServiceDep,
+    SummaryServiceDep,
     get_current_user,
 )
-from app.schemas.document_schema import DocumentOut
+from app.schemas.document_schema import DocumentContentOut, DocumentOut
 from app.schemas.response_schema import BaseResponse
 from app.schemas.summary_schema import (
     OverwriteSummaryRequest,
@@ -38,45 +48,60 @@ class SummarizeRequest(BaseModel):
     response_model=BaseResponse[DocumentOut],
 )
 async def upload_and_process_document(
+    background_tasks: BackgroundTasks,
     doc_service: DocumentServiceDep,
+    processing_service: DocumentProcessingServiceDep,
     current_user: CurrentUserDep,
     file: UploadFile = File(...),
 ):
     file_bytes = await file.read()
-    new_doc = await doc_service.upload_and_process_document(
+
+    new_doc = await doc_service.upload_and_init_document(
         file_bytes=file_bytes, filename=file.filename, user_id=current_user.id
     )
-    return BaseResponse(message="Đã đọc và lưu trữ tài liệu thành công.", data=new_doc)
+
+    background_tasks.add_task(
+        processing_service.execute_processing_pipeline,
+        document_id=new_doc.id,
+        mongo_id=new_doc.mongo_id,
+        object_name=new_doc.file_path,
+    )
+
+    return BaseResponse(
+        message="Tài liệu đã được tải lên thành công. Tiến trình phân tích cấu trúc đang được xử lý tự động.",
+        data=new_doc,
+    )
 
 
 @router.post("/summarize", status_code=status.HTTP_200_OK, response_model=BaseResponse)
 async def summarize_document(
     payload: SummarizeRequest,
     doc_service: DocumentServiceDep,
-    ai_service: AISummarizerServiceDep,
+    summary_service: SummaryServiceDep,
     current_user: CurrentUserDep,
 ):
-    doc_record = doc_service.get_documents(
-        current_user.id, document_id=payload.document_id
+    doc_record = doc_service.get_document(
+        user_id=current_user.id,
+        document_id=payload.document_id,
     )
     if not doc_record or not doc_record.mongo_id:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
 
-    summary_result = await ai_service.generate_summary(
+    summary_result = await summary_service.generate_summary(
         mongo_id=doc_record.mongo_id,
         level=payload.level,
         format_type=payload.format,
         instruction=payload.instruction,
     )
-    return BaseResponse(data={"summary": summary_result})
+    return BaseResponse(data={"summary_text": summary_result})
 
 
 @router.post(
     "/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse
 )
-async def save_manual_summary(
+async def save_summary(
     payload: SaveSummaryRequest,
-    summary_service: DocumentSummaryServiceDep,
+    summary_record_service: SummaryRecordServiceDep,
     current_user: CurrentUserDep,
 ):
     config = {
@@ -84,7 +109,7 @@ async def save_manual_summary(
         "format": payload.format,
         "instruction": payload.instruction,
     }
-    result = await summary_service.save_manual_summary(
+    result = await summary_record_service.save_summary(
         user_id=current_user.id,
         document_id=payload.document_id,
         title=payload.title,
@@ -99,16 +124,17 @@ async def save_manual_summary(
     status_code=status.HTTP_200_OK,
     response_model=BaseResponse,
 )
-async def overwrite_existing_summary(
+async def update_summary(
     summary_id: int,
     payload: OverwriteSummaryRequest,
-    summary_service: DocumentSummaryServiceDep,
+    summary_record_service: SummaryRecordServiceDep,
     current_user: CurrentUserDep,
 ):
-    result = await summary_service.overwrite_summary(
+    result = await summary_record_service.update_summary(
         user_id=current_user.id,
         summary_id=summary_id,
         summary_text=payload.summary_text,
+        title=payload.title,
     )
     return BaseResponse(data=result)
 
@@ -119,11 +145,11 @@ async def overwrite_existing_summary(
     response_model=BaseResponse[list[SummaryOut]],
 )
 async def get_summary_history(
-    summary_service: DocumentSummaryServiceDep,
+    summary_record_service: SummaryRecordServiceDep,
     current_user: CurrentUserDep,
     document_id: Optional[int] = Query(None),
 ):
-    history = summary_service.get_summary_history_list(
+    history = summary_record_service.get_summary_history_list(
         user_id=current_user.id, document_id=document_id
     )
     return BaseResponse(data=history)
@@ -136,10 +162,10 @@ async def get_summary_history(
 )
 async def get_summary_detail(
     summary_id: int,
-    summary_service: DocumentSummaryServiceDep,
+    summary_record_service: SummaryRecordServiceDep,
     current_user: CurrentUserDep,
 ):
-    detail = await summary_service.get_summary_detail(
+    detail = await summary_record_service.get_summary_detail(
         user_id=current_user.id, summary_id=summary_id
     )
     return BaseResponse(data=detail)
@@ -156,15 +182,48 @@ async def get_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, le=100),
 ):
-    docs = doc_service.get_documents(
-        current_user.id, skip, limit, status_filter, document_id
-    )
-    if document_id and not docs:
-        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
-
     if document_id:
-        return BaseResponse(data=[docs])
+        doc = doc_service.get_document(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+
+        if doc is None:
+            raise HTTPException(404, "Không tìm thấy tài liệu")
+
+        return BaseResponse(data=[doc])
+
+    docs = doc_service.list_documents(
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit,
+        status_filter=status_filter,
+    )
+
     return BaseResponse(data=docs)
+
+
+@router.get(
+    "/{document_id}/content",
+    response_model=BaseResponse[DocumentContentOut],
+)
+async def get_document_raw_content(
+    document_id: int,
+    current_user: CurrentUserDep,
+    document_service: DocumentServiceDep,
+):
+    content = await document_service.get_document_content(
+        document_id=document_id,
+        user_id=current_user.id,
+    )
+
+    if content is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy tài liệu",
+        )
+
+    return BaseResponse(data=DocumentContentOut.model_validate(content))
 
 
 @router.delete(

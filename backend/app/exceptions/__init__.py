@@ -16,6 +16,7 @@ from .auth import (
     PermissionDeniedError,
 )
 from .handlers import app_exception_handler, error_to_content
+from .classifier import ClassifierParseError
 
 __all__ = [
     "AppError",
