@@ -12,6 +12,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/chroma_storage:/app/chroma_storage
     env_file:
       - ./backend/.env.dev
     environment:
