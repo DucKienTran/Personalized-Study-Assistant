@@ -16,7 +16,8 @@ class ClassifierPromptBuilder:
     @staticmethod
     def build(markdown: str) -> str:
         categories_str = "\n".join(
-            f"- {category.value}: {CATEGORY_DESCRIPTIONS[category]}" for category in Category
+            f"- {category.value}: {CATEGORY_DESCRIPTIONS[category]}"
+            for category in Category
         )
 
         purposes_str = "\n".join(
@@ -51,7 +52,6 @@ Rules
 - Categories must come ONLY from the supported list.
 - Purpose must be exactly ONE supported value.
 - Language must be exactly ONE supported value.
-- Keywords should contain 5-10 important concepts representing the text.
 - Do not invent information.
 
 ========================
@@ -61,7 +61,6 @@ JSON Schema Output
     "categories": ["computer_science"],
     "language": "en",
     "purpose": "learning_material",
-    "keywords": ["TCP", "Congestion Control", "Sliding Window"]
 }}
 
 ========================

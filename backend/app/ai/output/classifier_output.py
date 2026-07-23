@@ -15,9 +15,5 @@ class ClassifierOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     categories: list[Category]
-
     language: Language
-
     purpose: Purpose
-
-    keywords: list[str]

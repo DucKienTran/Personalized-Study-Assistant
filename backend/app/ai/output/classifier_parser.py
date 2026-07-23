@@ -26,9 +26,7 @@ class ClassifierOutputParser:
         try:
             payload = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            raise ClassifierParseError(
-                f"Gemini returned invalid JSON: {e}"
-            ) from e
+            raise ClassifierParseError(f"Gemini returned invalid JSON: {e}") from e
 
         try:
             output = ClassifierOutput.model_validate(payload)
@@ -41,5 +39,4 @@ class ClassifierOutputParser:
             categories=output.categories,
             language=output.language,
             purpose=output.purpose,
-            keywords=output.keywords,
         )

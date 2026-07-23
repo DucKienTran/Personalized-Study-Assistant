@@ -12,7 +12,9 @@ class AIClassifier:
     def __init__(self, llm_client: LLMClient):
         self.llm_client = llm_client
 
-    def _extract_representative_text(self, raw_text: str, max_chars: int = 12000) -> str:
+    def _extract_representative_text(
+        self, raw_text: str, max_chars: int = 12000
+    ) -> str:
         if len(raw_text) <= max_chars:
             return raw_text
 
@@ -32,7 +34,9 @@ class AIClassifier:
             mid_start = mid_start_raw
 
         mid_end = raw_text.rfind("\n", mid_start, mid_start + mid_size)
-        middle = raw_text[mid_start : mid_end if mid_end != -1 else mid_start + mid_size]
+        middle = raw_text[
+            mid_start : mid_end if mid_end != -1 else mid_start + mid_size
+        ]
 
         # Trích xuất phần cuối tài liệu
         tail_start_raw = max(0, len(raw_text) - tail_size)
@@ -47,7 +51,7 @@ class AIClassifier:
         """
         if not raw_text:
             return DocumentAIClassification(
-                categories=[], language="other", purpose="reference", keywords=[]
+                categories=[], language="other", purpose="reference"
             )
 
         sampled_text = self._extract_representative_text(raw_text)
