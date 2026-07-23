@@ -4,11 +4,6 @@ from typing import Protocol
 class LLMClient(Protocol):
     """
     Interface cho mọi Large Language Model client.
-
-    Ví dụ:
-    - GeminiClient
-    - OpenAIClient
-    - ClaudeClient
     """
 
     async def generate(self, prompt: str) -> str:
@@ -20,3 +15,5 @@ class LLMClient(Protocol):
                 Khi LLM gặp lỗi hoặc không thể sinh nội dung.
         """
         ...
+
+    async def generate_stream(self, prompt: str): ...

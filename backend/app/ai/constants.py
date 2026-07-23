@@ -40,38 +40,17 @@ class Purpose(StrEnum):
 # ==========================================================
 
 CATEGORY_DESCRIPTIONS: Final[dict[Category, str]] = {
-    Category.MATHEMATICS:
-        "Mathematics and Statistics.",
-
-    Category.COMPUTER_SCIENCE:
-        "Computer Science and Software Engineering.",
-
-    Category.PHYSICS:
-        "Physics and related fields.",
-
-    Category.CHEMISTRY:
-        "Chemistry and related fields.",
-
-    Category.BIOLOGY:
-        "Biology and Life Sciences.",
-
-    Category.ECONOMICS_BUSINESS:
-        "Economics, Finance, Business and Management.",
-
-    Category.SOCIAL_SCIENCES_HUMANITIES:
-        "History, Geography, Philosophy, Law, Psychology and related disciplines.",
-
-    Category.LANGUAGE_LITERATURE:
-        "Languages, Linguistics and Literature.",
-
-    Category.MEDICINE_HEALTH:
-        "Medicine, Pharmacy, Nursing and Health Sciences.",
-
-    Category.ARTS:
-        "Arts, Music, Design and Architecture.",
-
-    Category.OTHER:
-        "None of the predefined categories.",
+    Category.MATHEMATICS: "Mathematics and Statistics.",
+    Category.COMPUTER_SCIENCE: "Computer Science and Software Engineering.",
+    Category.PHYSICS: "Physics and related fields.",
+    Category.CHEMISTRY: "Chemistry and related fields.",
+    Category.BIOLOGY: "Biology and Life Sciences.",
+    Category.ECONOMICS_BUSINESS: "Economics, Finance, Business and Management.",
+    Category.SOCIAL_SCIENCES_HUMANITIES: "History, Geography, Philosophy, Law, Psychology and related disciplines.",
+    Category.LANGUAGE_LITERATURE: "Languages, Linguistics and Literature.",
+    Category.MEDICINE_HEALTH: "Medicine, Pharmacy, Nursing and Health Sciences.",
+    Category.ARTS: "Arts, Music, Design and Architecture.",
+    Category.OTHER: "None of the predefined categories.",
 }
 
 
@@ -80,20 +59,11 @@ CATEGORY_DESCRIPTIONS: Final[dict[Category, str]] = {
 # ==========================================================
 
 PURPOSE_DEFINITIONS: Final[dict[Purpose, str]] = {
-    Purpose.LEARNING_MATERIAL:
-        "Lecture notes, textbooks, learning materials or study guides.",
-
-    Purpose.EXAM:
-        "Exam papers, mock tests, quizzes or assessment documents.",
-
-    Purpose.SOLUTION:
-        "Answer keys, worked solutions or grading rubrics.",
-
-    Purpose.ASSIGNMENT:
-        "Homework, exercises, worksheets or project requirements.",
-
-    Purpose.REFERENCE:
-        "Reference documents that support learning but are not intended as primary teaching material.",
+    Purpose.LEARNING_MATERIAL: "Lecture notes, textbooks, learning materials or study guides.",
+    Purpose.EXAM: "Exam papers, mock tests, quizzes or assessment documents.",
+    Purpose.SOLUTION: "Answer keys, worked solutions or grading rubrics.",
+    Purpose.ASSIGNMENT: "Homework, exercises, worksheets or project requirements.",
+    Purpose.REFERENCE: "Reference documents that support learning but are not intended as primary teaching material.",
 }
 
 # ==========================================================

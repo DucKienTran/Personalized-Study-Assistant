@@ -57,3 +57,20 @@ class GeminiClient(LLMClient):
         except Exception as exc:
             logger.exception("Gemini generation failed.")
             raise LLMGenerationError(f"Lỗi khi gọi Gemini: {exc}") from exc
+
+    async def generate_stream(self, prompt: str):
+        try:
+            logger.info("Streaming response from Gemini...")
+
+            response = await self.model.generate_content_async(
+                prompt,
+                stream=True,
+            )
+
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+
+        except Exception as exc:
+            logger.exception("Gemini streaming failed.")
+            raise LLMGenerationError(f"Lỗi khi stream Gemini: {exc}") from exc

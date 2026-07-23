@@ -49,3 +49,6 @@ langchain
 langchain-core
 langchain-text-splitters
 minio
+voyageai
+chromadb
+rank-bm25==0.2.2
