@@ -25,7 +25,7 @@ export default function DocumentSummaryPage() {
     const params = useParams<{ id: string }>();
     const documentId = Number(params.id);
     const searchParams = useSearchParams();
-
+    
     const [document, setDocument] = useState<DocumentListItem | null>(null);
     const [history, setHistory] = useState<SummaryHistoryItem[]>([]);
     const defaultTitle = document ? `Bản tóm tắt ${document.title}` : "Bản tóm tắt tài liệu";
@@ -47,19 +47,19 @@ export default function DocumentSummaryPage() {
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     const [duplicateTarget, setDuplicateTarget] = useState<SummaryHistoryItem | null>(null);
-
+    
     const resultRef = useRef<HTMLDivElement>(null);
 
 
     useEffect(() => {
-        documentService.getDocument(documentId).then(setDocument);
-        summaryService.listHistory(documentId).then(setHistory).catch(() => { });
+    documentService.getDocument(documentId).then(setDocument);
+    summaryService.listHistory(documentId).then(setHistory).catch(() => {});
 
-        const summaryIdParam = searchParams.get("summaryId");
-        if (summaryIdParam) {
-            loadSummaryDetail(Number(summaryIdParam));
-        }
-    }, [documentId]);
+    const summaryIdParam = searchParams.get("summaryId"); 
+    if (summaryIdParam) {
+        loadSummaryDetail(Number(summaryIdParam));
+    }
+}, [documentId]);
 
     const handleGenerate = async () => {
         setLoading(true);
@@ -88,20 +88,11 @@ export default function DocumentSummaryPage() {
         setSaving(true);
         setError(null);
         try {
-            const saved = await summaryService.save({
-            document_id: documentId,
-            title: finalTitle,
-            summary_text: summary,
-            level,
-            format,
-            instruction: instruction.trim() || undefined,
-        });
-
-        setViewingHistoryId(saved.summary_id);
-
-        const refreshed = await summaryService.listHistory(documentId);
-
-        setHistory(refreshed);
+            await summaryService.save({
+                document_id: documentId, title: finalTitle, summary_text: summary, level, format, instruction: instruction.trim() || undefined,
+            });
+            const refreshed = await summaryService.listHistory(documentId); // 👈 refetch thay vì tự ghép object thiếu field
+            setHistory(refreshed);
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 1500);
         } catch (err: any) {
@@ -111,47 +102,14 @@ export default function DocumentSummaryPage() {
         }
     };
 
-    const handleSaveClick = async () => {
+    const handleSaveClick = () => {
         if (!summary) return;
-
-        const finalTitle = title.trim() || defaultTitle;
-
-        // Đang xem một bản ghi đã lưu -> luôn UPDATE
-        if (viewingHistoryId !== null) {
-            setSaving(true);
-            setError(null);
-
-            try {
-                await summaryService.update({
-                    summary_id: viewingHistoryId,
-                    summary_text: summary,
-                    title: finalTitle,
-                });
-
-                const refreshed = await summaryService.listHistory(documentId);
-                setHistory(refreshed);
-
-                setTitle(finalTitle);
-
-                setSaveSuccess(true);
-                setTimeout(() => setSaveSuccess(false), 1500);
-            } catch (err: any) {
-                setError(err?.response?.data?.detail || "Cập nhật thất bại.");
-            } finally {
-                setSaving(false);
-            }
-
-            return;
-        }
-
-        // Chưa có bản ghi -> tạo mới như cũ
+        const finalTitle = title.trim() || defaultTitle; // 👈 nếu chưa gõ gì, lấy luôn gợi ý làm tên thật
         const duplicate = history.find((h) => h.title === finalTitle);
-
         if (duplicate) {
             setDuplicateTarget(duplicate);
             return;
         }
-
         doSave(finalTitle);
     };
 
@@ -162,11 +120,7 @@ export default function DocumentSummaryPage() {
         const target = duplicateTarget;
         setDuplicateTarget(null);
         try {
-            await summaryService.update({
-                summary_id: target.id,
-                summary_text: summary,
-                title: title.trim() || target.title,
-            });
+            await summaryService.overwrite(target.id, summary); 
             const refreshed = await summaryService.listHistory(documentId);
             setHistory(refreshed);
             setSaveSuccess(true);
@@ -196,7 +150,7 @@ export default function DocumentSummaryPage() {
             setSummary(detail.summary_text);
             setTimeout(() => {
                 resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }, 100);
+            }, 100); 
         } catch {
             setError("Không tải được bản tóm tắt này.");
         }
@@ -214,7 +168,7 @@ export default function DocumentSummaryPage() {
         return `${base} (${i})`;
     };
 
-
+    
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pt-4">
@@ -295,8 +249,9 @@ export default function DocumentSummaryPage() {
                         <button
                             onClick={handleSaveClick}
                             disabled={saving}
-                            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40 ${saveSuccess ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                }`}
+                            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40 ${
+                                saveSuccess ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            }`}
                         >
                             {saveSuccess ? <Icons.CheckIcon className="w-4 h-4" /> : <Icons.SaveIcon className="w-4 h-4" />}
                             {saveSuccess ? "Đã lưu" : "Lưu bản ghi"}
@@ -343,8 +298,9 @@ export default function DocumentSummaryPage() {
                             <button
                                 onClick={handleCopy}
                                 title="Sao chép"
-                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${copied ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                    }`}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                                    copied ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                }`}
                             >
                                 {copied ? <Icons.CheckIcon className="w-4 h-4" /> : <Icons.DocumentDuplicateIcon className="w-4 h-4" />}
                                 {copied ? "Đã sao chép" : "Sao chép"}

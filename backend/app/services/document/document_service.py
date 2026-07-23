@@ -1,24 +1,19 @@
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Optional
-from uuid import uuid4
 
-from bson import ObjectId
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.exceptions.base import BadRequestError
 from app.models.document_model import Document
-from app.storage.base import StorageService
-
-SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
+from app.services.document.parser import DocumentParserService
 
 
-# abc
 class DocumentService:
-    def __init__(self, sql_db: Session, mongo_db, storage_service: StorageService):
+    def __init__(
+        self, sql_db: Session, mongo_db, parser_service: DocumentParserService
+    ):
         self.sql_db = sql_db
         self.mongo_collection = mongo_db["parsed_documents"]
-        self.storage_service = storage_service
+        self.parser_service = parser_service
 
     def _get_unique_title(self, user_id: int, base_title: str) -> str:
         existing_titles = {
@@ -34,43 +29,36 @@ class DocumentService:
             i += 1
         return f"{base_title} ({i})"
 
-    async def upload_and_init_document(
+    async def upload_and_process_document(
         self, file_bytes: bytes, filename: str, user_id: int
-    ) -> Document:
-        extension = Path(filename).suffix.lower()
-        if extension not in SUPPORTED_EXTENSIONS:
-            raise BadRequestError("Hệ thống hiện chỉ hỗ trợ PDF và DOCX.")
+    ):
+        if not filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hệ thống chỉ hỗ trợ xử lý tài liệu định dạng PDF.",
+            )
 
-        object_name = f"{uuid4()}{extension}"
-        await self.storage_service.upload_file(
-            object_name=object_name,
-            file_bytes=file_bytes,
-            content_type=(
-                "application/pdf"
-                if extension == ".pdf"
-                else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ),
+        total_pages, extracted_text = self.parser_service._extract_text_sync(
+            file_bytes, filename
         )
-
         final_title = self._get_unique_title(user_id, filename)
 
         mongo_data = {
             "title": final_title,
-            "object_name": object_name,
-            "raw_text": "",
-            "outline": [],
-            "classification": None,
+            "total_pages": total_pages,
+            "content_raw": extracted_text,
+            "summary": None,
             "status": "pending",
             "created_at": datetime.now(UTC),
         }
         mongo_result = await self.mongo_collection.insert_one(mongo_data)
 
-        # Lưu thông tin ban đầu vào MySQL
+        # Lưu MySQL
         new_doc = Document(
             user_id=user_id,
             title=final_title,
-            file_path=object_name,
-            file_type=extension.lstrip("."),
+            file_path="chua_co_storage",
+            file_type="pdf",
             mongo_id=str(mongo_result.inserted_id),
             status="pending",
         )
@@ -78,89 +66,25 @@ class DocumentService:
         self.sql_db.commit()
         self.sql_db.refresh(new_doc)
 
+        # Chỉ trả về Object thô, không bọc chữ "status": "success" bừa bãi
         return new_doc
 
-    async def get_document_content(
-        self,
-        document_id: int,
-        user_id: int,
-    ) -> Optional[dict]:
-
-        document = (
-            self.sql_db.query(Document)
-            .filter(
-                Document.id == document_id,
-                Document.user_id == user_id,
-            )
-            .first()
-        )
-
-        if document is None:
-            return None
-
-        mongo_doc = await self.mongo_collection.find_one(
-            {"_id": ObjectId(document.mongo_id)}
-        )
-
-        if mongo_doc is None:
-            return None
-
-        return {
-            "title": document.title,
-            "file_type": document.file_type,
-            "total_pages": mongo_doc["total_pages"],
-            "content_raw": mongo_doc["content_raw"],
-        }
-
-    def get_document(
-        self,
-        user_id: int,
-        document_id: int,
-    ) -> Optional[Document]:
-        return (
-            self.sql_db.query(Document)
-            .filter(
-                Document.id == document_id,
-                Document.user_id == user_id,
-            )
-            .first()
-        )
-
-    def list_documents(
+    def get_documents(
         self,
         user_id: int,
         skip: int = 0,
         limit: int = 10,
-        status_filter: Optional[str] = None,
-    ) -> list[Document]:
+        status_filter: str = None,
+        document_id: int = None,
+    ):
         query = self.sql_db.query(Document).filter(Document.user_id == user_id)
-
+        if document_id:
+            return query.filter(Document.id == document_id).first()
         if status_filter:
             query = query.filter(Document.status == status_filter)
-
         return (
             query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
         )
-
-    def list_document_ids(
-        self,
-        user_id: int,
-        status_filter: str = "completed",
-    ) -> list[int]:
-        """
-        Trả về danh sách ID của các tài liệu thuộc người dùng.
-        Mặc định chỉ lấy tài liệu đã xử lý xong để phục vụ Retrieval / RAG.
-        """
-        rows = (
-            self.sql_db.query(Document.id)
-            .filter(
-                Document.user_id == user_id,
-                Document.status == status_filter,
-            )
-            .all()
-        )
-
-        return [row.id for row in rows]
 
     async def delete_document(self, document_id: int, user_id: int) -> bool:
         doc = (

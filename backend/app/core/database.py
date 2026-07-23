@@ -1,5 +1,3 @@
-import chromadb
-from chromadb.api import ClientAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 import redis.asyncio as redis
 from sqlalchemy import create_engine
@@ -41,19 +39,3 @@ class MongoClientManager:
 
 
 mongo_client = MongoClientManager()
-
-
-class ChromaClientManager:
-    def __init__(self):
-        self.client: ClientAPI | None = None
-
-    def init_db(self):
-        self.client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
-
-    def close_db(self):
-        # PersistentClient tự flush xuống đĩa, không có kết nối network cần đóng tường minh
-        # như Mongo — giữ hàm này để khớp lifecycle interface, không phải bug thiếu code.
-        pass
-
-
-chroma_client = ChromaClientManager()

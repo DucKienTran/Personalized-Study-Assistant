@@ -10,16 +10,12 @@ from sqlalchemy.sql import text
 
 from app.api.auth import router as auth_router
 from app.api.documents import router as documents_router
-from app.api.quizzes import attempts_router as quiz_attempts_router
-from app.api.quizzes import router as quizzes_router
 from app.api.users import router as users_router
-from app.api.rag import router as rag_router
 from app.core.config import settings
-from app.core.database import Base, chroma_client, engine, mongo_client, redis_client
+from app.core.database import Base, engine, mongo_client, redis_client
 from app.core.logging import setup_logging
 from app.exceptions import AppError, app_exception_handler
 import app.models
-from app.storage.minio_storage import minio_manager
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -56,20 +52,6 @@ async def lifespan(app: FastAPI):
         logger.info("Kết nối MongoDB thành công.")
     except Exception as e:
         logger.critical(f"LỖI KẾT NỐI DATABASE MONGODB: {str(e)}")
-        raise e
-
-    try:
-        chroma_client.init_db()
-        logger.info("Kết nối ChromaDB thành công.")
-    except Exception as e:
-        logger.critical(f"LỖI KHỞI TẠO CHROMADB: {str(e)}")
-        raise e
-
-    try:
-        minio_manager.init_service()
-        logger.info("Kết nối MinIO thành công.")
-    except Exception as e:
-        logger.critical(f"LỖI KHỞI TẠO MINIO: {str(e)}")
         raise e
 
     yield
@@ -121,12 +103,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(auth_router, prefix=settings.API_STR)
-app.include_router(users_router, prefix=settings.API_STR)
-app.include_router(documents_router, prefix=settings.API_STR)
-app.include_router(quizzes_router, prefix=settings.API_STR)
-app.include_router(quiz_attempts_router, prefix=settings.API_STR)
-app.include_router(rag_router, prefix=settings.API_STR)
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(users_router, prefix=settings.API_V1_STR)
+app.include_router(documents_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

@@ -8,15 +8,12 @@ class Settings(BaseSettings):
     )
 
     PROJECT_NAME: str = "LearningAId"
-    API_STR: str = "/api"
+    API_V1_STR: str = "/api/v1"
 
     # Secret
     GEMINI_API_KEY: str
     JWT_SECRET_KEY: str
     ADMIN_REGISTRATION_KEY: str
-    VOYAGE_API_KEY: str
-    VOYAGE_MODEL: str = "voyage-4-lite"
-    VOYAGE_EMBEDDING_BATCH_SIZE: int
 
     # Database MySQL Config
     DB_HOST: str
@@ -30,11 +27,11 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
-    # Redis Config
+    # Cấu hình Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
-    # MongoDB Config
+    # Cấu hình MongoDB
     MONGODB_HOST: str = "localhost"
     MONGODB_PORT: int = 27017
     MONGODB_NAME: str
@@ -42,23 +39,6 @@ class Settings(BaseSettings):
     @property
     def MONGODB_URL(self) -> str:
         return f"mongodb://{self.MONGODB_HOST}:{self.MONGODB_PORT}"
-
-    # MinIO Config
-    MINIO_HOST: str = "localhost"
-    MINIO_PORT: int = 9000
-
-    @property
-    def MINIO_ENDPOINT(self) -> str:
-        return f"{self.MINIO_HOST}:{self.MINIO_PORT}"
-
-    MINIO_ACCESS_KEY: str
-    MINIO_SECRET_KEY: str
-    MINIO_BUCKET: str = "documents"
-    MINIO_SECURE: bool = False
-
-    # ChromaDB Config (embedded mode — chạy trong chính container backend)
-    CHROMA_PERSIST_DIR: str
-    CHROMA_COLLECTION_NAME: str = "learning_aid_chunks"
 
     # Token & Security Config
     JWT_ALGORITHM: str = "HS256"
@@ -68,15 +48,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
     ONLINE_STATUS_EXPIRE_SECONDS: int = 300
-
-    # AI model
-    GEMINI_MODEL: str
-
-    # Chunking
-    CHARS_PER_PAGE: str
-
-    # Rag
-    RAG_TOP_K: int = 5
 
 
 settings = Settings()
