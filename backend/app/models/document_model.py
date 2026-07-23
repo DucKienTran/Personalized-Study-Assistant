@@ -1,10 +1,8 @@
-# app/models/document_model.py
 from sqlalchemy import (
     JSON,
     TIMESTAMP,
     Column,
     ForeignKey,
-    Integer,
     String,
     Text,
 )
@@ -30,23 +28,16 @@ class Document(Base):
 
     mongo_id = Column(String(50), nullable=True)
 
+    # metadata Chứa toàn bộ thông tin phân loại
+    # {"purpose": "learning", "unlock_essay": true, "has_educational_images": true, "image_captions": [...]}
+    metadata_info = Column(JSON, nullable=True)
+
     status = Column(
         String(50), default="pending"
     )  # pending, processing, completed, failed
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-    # AI Classification info (Copy một phần từ AI Classification sang MySQL)
-    language = Column(String(10), nullable=True)
-    purpose = Column(String(50), nullable=True)
-    categories = Column(JSON, nullable=True)  # [ "social_sciences_humanities", ... ]
-
-    # Thống kê
-    total_pages = Column(Integer, default=0)
-    total_chunks = Column(Integer, default=0)
-    total_characters = Column(Integer, default=0)
-    estimated_tokens = Column(Integer, default=0)
 
     # Quan hệ
     user = relationship("User", back_populates="documents")
@@ -70,8 +61,10 @@ class DocumentSummary(Base):
     )
     title = Column(String(255), nullable=False)
 
+    # Khóa ngoại dạng chuỗi trỏ sang ObjectId của MongoDB
     mongo_summary_id = Column(String(50), nullable=False)
 
+    # Lưu cấu hình lúc sinh bản tóm tắt
     level = Column(String(50), nullable=False)  # short | normal | detailed
     format = Column(String(50), nullable=False)  # paragraph | bullet | markdown
     instruction = Column(Text, nullable=True)
@@ -79,4 +72,5 @@ class DocumentSummary(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
+    # Quan hệ ngược lại với Document
     document = relationship("Document", back_populates="summaries")

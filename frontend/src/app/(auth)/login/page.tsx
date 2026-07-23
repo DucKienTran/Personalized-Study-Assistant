@@ -45,18 +45,18 @@
       } catch (err: any) {
         const errorData = err.response?.data?.detail;
         if (Array.isArray(errorData)) {
-          setError(errorData[0]?.msg || "Invalid input data.");
+          setError(errorData[0]?.msg || "Dữ liệu nhập vào không hợp lệ.");
         } else if (typeof errorData === "string") {
           setError(errorData);
         } else {
-          setError("Login failed. Please check your email or password!");
+          setError("Đăng nhập thất bại. Vui lòng kiểm tra lại email hoặc mật khẩu!");
         }
         setLoading(false);
       }
     };
 
     if (showRedirectLoading) {
-      return <RedirectLoading message="Login successful! Entering the system..." />;
+      return <RedirectLoading message="Đăng nhập thành công! Đang vào hệ thống..." />;
     }
 
     return (
@@ -93,9 +93,8 @@
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-
-                                <label className="text-[13px] font-medium text-[#4a6351]">Password</label>
-                <a href="#" className="text-[12px] font-medium text-[#428a5d] hover:underline">Forgot password?</a>
+                <label className="text-[13px] font-medium text-[#4a6351]">Mật khẩu</label>
+                <a href="#" className="text-[12px] font-medium text-[#428a5d] hover:underline">Quên mật khẩu?</a>
               </div>
               <input
                 type="password"
@@ -112,18 +111,19 @@
                 type="submit"
                 disabled={loading}
                 className="w-full py-2.5 bg-[#3b7a52] hover:bg-[#2e5f3f] text-white text-[14px] font-semibold rounded-lg shadow-sm transition-colors duration-150 disabled:bg-[#cbd5e1] disabled:cursor-not-allowed"
-              > {loading ? "Processing..." : "Log In"}
+              >
+                {loading ? "Đang xử lý..." : "Đăng Nhập"}
               </button>
             </div>
           </form>
 
-                    <div className="mt-4 text-center text-[13px] text-[#6b8775]">
-            New user?{" "}
+          <div className="mt-4 text-center text-[13px] text-[#6b8775]">
+            Bạn là người mới?{" "}
             <Link 
               href={isAdminMode ? "/register-admin" : "/register"} 
               className="font-semibold text-[#3b7a52] hover:underline ml-1"
             >
-              Create account
+              Tạo tài khoản
             </Link>
           </div>
 
