@@ -6,7 +6,9 @@ from langchain_core.documents import Document
 
 from app.services.document.models import ChunkMetadata, DocumentMetadata
 
-PAGE_TAG_PATTERN = re.compile(r"<!--\s*(?:page|PAGE|Page|Trang|trang)\s*:?\s*(\d+)\s*-->")
+PAGE_TAG_PATTERN = re.compile(
+    r"<!--\s*(?:page|PAGE|Page|Trang|trang)\s*:?\s*(\d+)\s*-->"
+)
 HEADER_KEYS = ("h1", "h2", "h3", "h4", "Header 1", "Header 2", "Header 3", "Header 4")
 
 
@@ -28,12 +30,16 @@ class MetadataBuilder:
             content = chunk.page_content
             char_count = len(content)
 
-            header_path = [chunk.metadata[k] for k in HEADER_KEYS if k in chunk.metadata]
+            header_path = [
+                chunk.metadata[k] for k in HEADER_KEYS if k in chunk.metadata
+            ]
             headings.update(header_path)
 
             found_pages = [int(p) for p in PAGE_TAG_PATTERN.findall(content)]
             page_start = found_pages[0] if found_pages else current_page_tracker
-            current_page_tracker = found_pages[-1] if found_pages else current_page_tracker
+            current_page_tracker = (
+                found_pages[-1] if found_pages else current_page_tracker
+            )
 
             chunk_metadata_list.append(
                 ChunkMetadata(
@@ -54,7 +60,7 @@ class MetadataBuilder:
                 total_chunks=total_chunks,
                 total_characters=total_characters,
                 estimated_tokens=total_estimated_tokens,
-                headings=sorted(headings),
+                outline=sorted(headings),
             ),
             chunk_metadata_list,
         )

@@ -12,18 +12,6 @@ from app.storage.base import StorageService
 class MinIOStorageService(StorageService):
     """
     Storage implementation using MinIO.
-
-    Flow
-
-    Upload
-        ↓
-    MinIO
-        ↓
-    Download to tempfile
-        ↓
-    Parser
-        ↓
-    tempfile auto deleted
     """
 
     def __init__(
@@ -108,3 +96,26 @@ class MinIOStorageService(StorageService):
             self.bucket_name,
             object_name,
         )
+
+
+class MinIOStorageManager:
+    def __init__(self):
+        self.service: MinIOStorageService | None = None
+
+    def init_service(self):
+        self.service = MinIOStorageService(
+            endpoint=settings.MINIO_ENDPOINT,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            bucket_name=settings.MINIO_BUCKET,
+            secure=settings.MINIO_SECURE,
+        )
+
+    def close_service(self):
+        # MinIO client dùng HTTP request-per-call, không giữ connection
+        # persistent cần đóng tường minh — giữ hàm này chỉ để khớp lifecycle
+        # interface với Mongo/Chroma, không phải thiếu code.
+        pass
+
+
+minio_manager = MinIOStorageManager()

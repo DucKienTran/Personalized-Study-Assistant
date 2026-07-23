@@ -9,11 +9,11 @@ from docx.text.paragraph import Paragraph
 import fitz
 import pymupdf4llm
 
+from app.core.config import settings
 from app.exceptions import AppError, BadRequestError, InternalServerError
 from app.storage.base import StorageService
 
 logger = logging.getLogger(__name__)
-CHARS_PER_PAGE = 3000  # Ngưỡng ước lượng số ký tự trên một trang A4 fluid
 
 
 @dataclass(slots=True)
@@ -72,7 +72,7 @@ class DocumentParserService:
             # Thư viện trả về index từ 0, ta cộng 1 để ra số trang thực tế của con người (1, 2, 3...)
             raw_page = meta.get("page", meta.get("page_number"))
             page_num = raw_page if raw_page is not None else None
-            
+
             marker = f"<!--page:{page_num}-->\n" if page_num is not None else ""
             parts.append(f"{marker}{p['text']}")
 
@@ -86,7 +86,7 @@ class DocumentParserService:
     def _parse_docx(self, docx_path: str) -> ParsedDocument:
         document = Document(docx_path)
         markdown_lines: list[str] = []
-        
+
         current_page = 1
         accumulated_chars = 0
 
@@ -96,7 +96,7 @@ class DocumentParserService:
         # Duyệt qua các phần tử để đảm bảo giữ nguyên thứ tự xuất hiện trong file
         for child in document.element.body:
             element_text = ""
-            
+
             if child.tag.endswith("p"):
                 paragraph = Paragraph(child, document)
                 text = paragraph.text.strip()
@@ -119,17 +119,21 @@ class DocumentParserService:
                 table = Table(child, document)
                 table_lines = []
                 for i, row in enumerate(table.rows):
-                    row_text = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+                    row_text = [
+                        cell.text.strip().replace("\n", " ") for cell in row.cells
+                    ]
                     table_lines.append("| " + " | ".join(row_text) + " |")
                     if i == 0:
-                        table_lines.append("| " + " | ".join(["---"] * len(row.cells)) + " |")
+                        table_lines.append(
+                            "| " + " | ".join(["---"] * len(row.cells)) + " |"
+                        )
                 element_text = "\n".join(table_lines) + "\n"
 
             if element_text:
                 markdown_lines.append(element_text)
                 accumulated_chars += len(element_text)
-                
-                if accumulated_chars >= CHARS_PER_PAGE:
+
+                if accumulated_chars >= settings.CHARS_PER_PAGE:
                     current_page += 1
                     markdown_lines.append(f"<!--page:{current_page}-->")
                     accumulated_chars = 0

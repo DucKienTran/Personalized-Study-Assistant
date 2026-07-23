@@ -1,6 +1,7 @@
+# app/services/document/models.py
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 from langchain_core.documents import Document
 
@@ -21,15 +22,18 @@ class ChunkMetadata:
     character_count: int
     previous_chunk: str | None = None
     next_chunk: str | None = None
+    embedding: list[float] | None = None
 
 
 @dataclass(slots=True)
 class DocumentMetadata:
+    """Chứa các thông số thống kê (dùng đẩy sang MySQL) và outline (dùng lưu Mongo)"""
+
     total_pages: int
     total_chunks: int
     total_characters: int
     estimated_tokens: int
-    headings: list[str] = field(default_factory=list)
+    outline: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -37,14 +41,12 @@ class DocumentAIClassification:
     categories: list[Category]
     language: Language
     purpose: Purpose
-    keywords: list[str]
 
     def to_mongo(self) -> dict:
         return {
             "categories": [c.value for c in self.categories],
             "language": self.language.value,
             "purpose": self.purpose.value,
-            "keywords": self.keywords,
         }
 
 
@@ -56,25 +58,11 @@ class ProcessedDocument:
     metadata: DocumentMetadata
     classification: DocumentAIClassification | None = None
 
-    def to_dict(self) -> dict:
-        assert len(self.chunks) == len(
-            self.chunk_metadata
-        ), "chunks và chunk_metadata lệch số lượng — bug ở ChunkBuilder/MetadataBuilder"
-
+    def to_mongo_dict(self) -> dict:
+        """Trả về dữ liệu tinh gọn để lưu vào MongoDB collection parsed_documents"""
         return {
-            "metadata": asdict(self.metadata),
-            "chunks": [
-                {
-                    "chunk_id": cm.chunk_id,
-                    "content": chunk.page_content,
-                    "header_path": cm.header_path,
-                    "page_start": cm.page_start,
-                    "page_end": cm.page_end,
-                    "estimated_tokens": cm.estimated_tokens,
-                    "character_count": cm.character_count,
-                    "previous_chunk": cm.previous_chunk,
-                    "next_chunk": cm.next_chunk,
-                }
-                for chunk, cm in zip(self.chunks, self.chunk_metadata)
-            ],
+            "outline": self.metadata.outline,
+            "classification": (
+                self.classification.to_mongo() if self.classification else None
+            ),
         }
