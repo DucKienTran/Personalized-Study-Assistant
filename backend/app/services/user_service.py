@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 import logging
 import time
 from typing import List, Optional, Union
@@ -22,8 +21,9 @@ from app.exceptions import (
     NotFoundError,
     UnauthorizedError,
 )
-from app.models.user_model import RefreshToken, User
+from app.models.user_model import User
 from app.schemas.user_schema import ChangePassword, CurrentUser
+from app.services.token_service import TokenService
 from app.services.presence_service import PresenceService
 
 logger = logging.getLogger(__name__)
@@ -38,55 +38,17 @@ class UserService:
         self.redis = redis
         self.presence = presence
 
+        self.token_service = TokenService(
+            db=db,
+            redis=redis,
+            presence=presence,
+        )
+
     def get_user_profile(self, current_user: CurrentUser) -> User:
         user = self.db.query(User).filter(User.id == current_user.id).first()
         if not user:
             raise NotFoundError("Người dùng không tồn tại.")
         return user
-
-    async def _revoke_all_user_tokens(self, user_id: int) -> None:
-        await self.redis.setex(f"user:revoked:{user_id}", 86400 * 7, "true")
-        await self.presence.clear_online_status(user_id)
-        logger.info(
-            f"Đã kích hoạt cờ thu hồi toàn bộ phiên làm việc của User ID [{user_id}]"
-        )
-        (
-            self.db.query(RefreshToken)
-            .filter(
-                RefreshToken.user_id == user_id,
-                RefreshToken.revoked.is_(False),
-            )
-            .update(
-                {"revoked": True},
-                synchronize_session=False,
-            )
-        )
-        self.db.commit()
-
-    def _save_refresh_token(
-        self,
-        user_id: int,
-        refresh_token: str,
-        jti: str,
-        ip_address: str | None,
-        user_agent: str | None,
-    ) -> None:
-        payload = decode_token(
-            refresh_token,
-            expected_type="refresh",
-        )
-
-        db_token = RefreshToken(
-            user_id=user_id,
-            jti=jti,
-            revoked=False,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            expired_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
-        )
-
-        self.db.add(db_token)
-        self.db.commit()
 
     def get_all_users(self, current_user: CurrentUser) -> List[User]:
         if current_user.role != "admin":
@@ -167,9 +129,7 @@ class UserService:
         if not db_user:
             raise NotFoundError("Người dùng không tồn tại.")
         if not verify_password(data.old_password, db_user.password_hash):
-            logger.warning(
-                f"Đổi mật khẩu thất bại: [{current_user.id}] nhập sai mật khẩu cũ."
-            )
+            logger.warning(f"Đổi mật khẩu thất bại: [{current_user.id}] nhập sai mật khẩu cũ.")
             raise BadRequestError("Mật khẩu cũ không chính xác.")
 
         if verify_password(data.new_password, db_user.password_hash):
@@ -184,9 +144,7 @@ class UserService:
             )
 
         if await is_refresh_token_blacklisted(self.redis, refresh_token):
-            logger.warning(
-                f"Phát hiện hành vi tái sử dụng Refresh Token: {refresh_token}"
-            )
+            logger.warning(f"Phát hiện hành vi tái sử dụng Refresh Token: {refresh_token}")
             raise UnauthorizedError(
                 "Phiên làm việc của bạn đã hết hạn hoặc thay đổi. Vui lòng đăng nhập lại."
             )
@@ -200,12 +158,13 @@ class UserService:
 
         db_user.password_hash = hash_password(data.new_password)
         self.db.commit()
-        logger.info(
-            f"Đổi mật khẩu thành công: [{current_user.id}, {current_user.email}]"
-        )
+        logger.info(f"Đổi mật khẩu thành công: [{current_user.id}, {current_user.email}]")
 
         await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
-        await self._revoke_all_user_tokens(db_user.id)
+        await self.token_service.revoke_all_user_tokens(
+            db_user.id,
+            revoke_db_tokens=True,
+        )
         await self.redis.delete(f"user:revoked:{db_user.id}")
 
         tokens = generate_tokens_pair(
@@ -214,7 +173,7 @@ class UserService:
             role_name=db_user.role.name,
             permissions=[p.name for p in db_user.role.permissions],
         )
-        self._save_refresh_token(
+        self.token_service.save_refresh_token(
             user_id=db_user.id,
             refresh_token=tokens["refresh_token"],
             jti=tokens["jti"],
@@ -224,9 +183,7 @@ class UserService:
 
         await self.presence.mark_online(db_user.id)
 
-        logger.info(
-            f"Cấp lại token thành công sau đổi mật khẩu cho user: [{db_user.id}]"
-        )
+        logger.info(f"Cấp lại token thành công sau đổi mật khẩu cho user: [{db_user.id}]")
 
         return {
             "access_token": tokens["access_token"],
@@ -241,9 +198,7 @@ class UserService:
         is_self_deletion = (target_id is None) or (target_id == current_user.id)
 
         if is_self_deletion:
-            user_to_delete = (
-                self.db.query(User).filter(User.id == current_user.id).first()
-            )
+            user_to_delete = self.db.query(User).filter(User.id == current_user.id).first()
         else:
             if current_user.role.name != "admin":
                 raise ForbiddenError("Không có quyền.")
@@ -252,11 +207,12 @@ class UserService:
             if not user_to_delete:
                 raise NotFoundError("Không tìm thấy tài khoản.")
 
-        user_info = (
-            f"[{user_to_delete.id}, {user_to_delete.email}, {user_to_delete.role}]"
-        )
+        user_info = f"[{user_to_delete.id}, {user_to_delete.email}, {user_to_delete.role}]"
 
-        await self._revoke_all_user_tokens(user_to_delete.id)
+        await self.token_service.revoke_all_user_tokens(
+            user_to_delete.id,
+            revoke_db_tokens=True,
+        )
 
         logger.info(f"Xóa tài khoản người dùng: {user_info} khỏi database.")
         self.db.delete(user_to_delete)
@@ -269,9 +225,7 @@ class UserService:
                 "self_deleted": True,
             }
 
-        logger.info(
-            f"Admin [{current_user.id}] đã xóa thành công tài khoản: {user_info}"
-        )
+        logger.info(f"Admin [{current_user.id}] đã xóa thành công tài khoản: {user_info}")
         return {
             "detail": f"Đã xóa tài khoản {user_info} thành công khỏi hệ thống.",
             "self_deleted": False,

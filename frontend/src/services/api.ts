@@ -1,83 +1,135 @@
-import axios from "axios";
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
+import { AUTH_EXCLUDED_ENDPOINTS, TOKEN_KEY } from "@/constants/auth";
+import { TokenResponse } from "@/types";
 
-const api = axios.create({
-  baseURL: (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api",
+export interface CustomInternalAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+interface QueueItem {
+  resolve: (token: string) => void;
+  reject: (error: AxiosError) => void;
+}
+
+export const tokenStorage = {
+  get: (): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(TOKEN_KEY);
+  },
+  set: (token: string): void => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TOKEN_KEY, token);
+    }
+  },
+  clear: (): void => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  },
+};
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+
+const api: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, 
 });
 
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: QueueItem[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (token) prom.resolve(token);
-    else prom.reject(error);
+const processQueue = (error: AxiosError | null, token: string | null = null): void => {
+  failedQueue.forEach((promise) => {
+    if (error) {
+      promise.reject(error);
+    } else if (token) {
+      promise.resolve(token);
+    }
   });
   failedQueue = [];
 };
 
-// Request Interceptor: Gắn Access Token vào Header
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
+const isAuthEndpoint = (url?: string): boolean => {
+  if (!url) return false;
+  return AUTH_EXCLUDED_ENDPOINTS.some((endpoint) => url.includes(endpoint));
+};
+
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = tokenStorage.get();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-  }
-  return config;
-});
+    return config;
+  },
+  (error: AxiosError) => Promise.reject(error)
+);
 
-// Response Interceptor: Xử lý lỗi 401 và tự động gọi Refresh Token
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as CustomInternalAxiosRequestConfig | undefined;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const response = await axios.post(
-          `${api.defaults.baseURL}/auth/token/refresh`,
-          {},
-          { withCredentials: true }
-        );
-
-        const { access_token } = response.data;
-        localStorage.setItem("access_token", access_token);
-
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        processQueue(null, access_token);
-
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("access_token");
-          window.location.href = "/login";
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    if (!originalRequest) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      isAuthEndpoint(originalRequest.url)
+    ) {
+      return Promise.reject(error);
+    }
+
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then((token: string) => {
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+          }
+          return api(originalRequest);
+        })
+        .catch((err: AxiosError) => Promise.reject(err));
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const response = await axios.post<TokenResponse>(
+        `${API_BASE_URL}/auth/token/refresh`,
+        {},
+        { withCredentials: true }
+      );
+
+      const { access_token } = response.data;
+      tokenStorage.set(access_token);
+
+      if (originalRequest.headers) {
+        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+      }
+
+      processQueue(null, access_token);
+      return api(originalRequest);
+    } catch (refreshError) {
+      const axiosError = refreshError as AxiosError;
+      processQueue(axiosError, null);
+      tokenStorage.clear();
+      return Promise.reject(axiosError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 

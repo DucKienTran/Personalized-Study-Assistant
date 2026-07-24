@@ -1,19 +1,14 @@
 import api from "./api";
+import { CurrentUser } from "@/types";
 
-// Interface giống với Schema UserResponse trong backend 
-export interface UserProfile {
-    id: number;
-    email: string;
-    role_name: string;
-    full_name?: string | null;
-    is_active: boolean;
-    created_at: string;
-    updated_at?: string | null;
+class UserService {
+  /**
+   * Get the currently authenticated user.
+   */
+  async getCurrentUser(): Promise<CurrentUser> {
+    const response = await api.get<CurrentUser>("/users/me");
+    return response.data;
+  }
 }
 
-export const userService = {
-    getMe: async (): Promise<UserProfile> => {
-        const response = await api.get("/users/me");
-        return response.data;
-    },
-};
+export const userService = new UserService();
