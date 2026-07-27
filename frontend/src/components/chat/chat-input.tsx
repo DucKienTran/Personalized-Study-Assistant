@@ -62,7 +62,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="w-full">
-      <div className="relative flex items-end rounded-2xl border border-gray-200 bg-white shadow-sm transition-all focus-within:border-[#69B989] focus-within:ring-2 focus-within:ring-[#8FCFA9]/30">
+      <div className="relative flex items-end rounded-2xl border border-gray-200 bg-white shadow-xs transition-all focus-within:border-[#69B989] focus-within:ring-2 focus-within:ring-[#8FCFA9]/30">
 
         <textarea
           ref={textareaRef}
@@ -72,7 +72,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           placeholder={placeholder}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          className="max-h-[180px] min-h-[52px] w-full resize-none bg-transparent px-4 py-3 pr-14 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none"
+          className="max-h-[180px] min-h-[52px] w-full resize-none bg-transparent px-4 py-3 pr-14 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-hidden"
         />
 
         <button
