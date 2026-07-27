@@ -15,7 +15,7 @@ export default function DocumentSelector({
     onSelect,
 }: Props) {
     return (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs">
             <div className="mb-3">
                 <h2 className="text-sm font-semibold text-gray-900">
                     Chọn tài liệu

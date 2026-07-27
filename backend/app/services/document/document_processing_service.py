@@ -4,9 +4,11 @@ import logging
 
 from bson import ObjectId
 from chromadb.api import ClientAPI
+from redis.asyncio import Redis
 from sqlalchemy.orm import Session
-from app.core.config import settings
+
 from app.ai.llm.base import LLMClient
+from app.core.config import settings
 from app.models.document_model import Document as SQLDocument
 from app.services.document.parser import DocumentParserService
 from app.services.document.pipeline import DocumentProcessingPipeline
@@ -24,6 +26,7 @@ class DocumentProcessingService:
         parser_service: DocumentParserService,
         storage_service: StorageService,
         llm_client: LLMClient,
+        redis: Redis,
     ):
         self.sql_db = sql_db
         self.mongo_collection = mongo_db["parsed_documents"]
@@ -31,14 +34,21 @@ class DocumentProcessingService:
         self.parser_service = parser_service
         self.storage_service = storage_service
         self.pipeline = DocumentProcessingPipeline(llm_client=llm_client)
+        self.redis = redis
 
     async def execute_processing_pipeline(
         self, document_id: int, mongo_id: str, object_name: str
     ) -> None:
-        # 1. Chuyển trạng thái MySQL -> processing
-        self.sql_db.query(SQLDocument).filter(SQLDocument.id == document_id).update(
-            {"status": "processing"}
+        doc = (
+            self.sql_db.query(SQLDocument).filter(SQLDocument.id == document_id).first()
         )
+        if not doc:
+            raise ValueError(f"Document with id {document_id} not found")
+
+        user_id = doc.user_id
+
+        # Cap nhat trang thai MySQL -> processing
+        doc.status = "processing"
         self.sql_db.commit()
 
         try:
@@ -46,7 +56,7 @@ class DocumentProcessingService:
         except Exception:
             target_id = mongo_id
 
-        # 2. Chuyển trạng thái MongoDB -> processing
+        # Cap nhat trang thai MongoDB -> processing
         await self.mongo_collection.update_one(
             {"_id": target_id},
             {
@@ -58,25 +68,25 @@ class DocumentProcessingService:
         )
 
         try:
-            # 3. Parse tài liệu ra Markdown
+            # Parse tai lieu ra Markdown
             parsed_document = await self.parser_service.parse_document(
                 object_name=object_name,
                 storage_service=self.storage_service,
             )
 
-            # 4. Chạy Pipeline (Clean -> Classify -> Chunk -> Metadata -> Embedding)
+            # Chay pipeline (Clean -> Classify -> Chunk -> Metadata -> Embedding)
             processed_document = await self.pipeline.process(
                 markdown=parsed_document.markdown,
                 total_pages=parsed_document.total_pages,
             )
 
-            # 5. Chuẩn hóa chunk_id độc nhất cho từng chunk
+            # Chuan hoa chunk_id doc nhat cho tung chunk
             for chunk, cm in zip(
                 processed_document.chunks, processed_document.chunk_metadata
             ):
                 cm.chunk_id = f"doc_{document_id}_{cm.chunk_id}"
 
-            # Trích xuất dữ liệu Classification
+            # Trich xuat du lieu classification
             language_val = None
             purpose_val = None
             categories_val = []
@@ -88,7 +98,7 @@ class DocumentProcessingService:
                     c.value for c in processed_document.classification.categories
                 ]
 
-                # 6. Đẩy Chunks & Vectors sang ChromaDB
+                # Day chunks va vectors sang ChromaDB
                 chroma_collection = self.chroma_client.get_or_create_collection(
                     name=settings.CHROMA_COLLECTION_NAME
                 )
@@ -128,8 +138,9 @@ class DocumentProcessingService:
                         embeddings=embeddings,
                         metadatas=metadatas,
                     )
+                    await self.redis.incr(f"rag:bm25:version:{user_id}")
 
-            # 7. Cập nhật MongoDB (parsed_documents) - KHÔNG LƯU chunks/metadata
+            # Cap nhat MongoDB (parsed_documents)
             classification_dict = (
                 processed_document.classification.to_mongo()
                 if processed_document.classification
@@ -154,7 +165,7 @@ class DocumentProcessingService:
                     f"Document with mongo_id {mongo_id} not found in MongoDB collection"
                 )
 
-            # 8. Cập nhật thống kê & Classification thông tin vào MySQL
+            # Cap nhat thong ke va classification thong tin vao MySQL
             self.sql_db.query(SQLDocument).filter(SQLDocument.id == document_id).update(
                 {
                     "status": "completed",
