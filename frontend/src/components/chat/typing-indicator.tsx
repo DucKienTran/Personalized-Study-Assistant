@@ -9,7 +9,7 @@ export const TypingIndicator: React.FC = () => {
       <div className="w-8 h-8 rounded-lg bg-[#8FCFA9]/20 text-[#69B989] flex items-center justify-center shrink-0">
         <Bot size={18} />
       </div>
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm max-w-[720px] flex items-center gap-2">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs max-w-[720px] flex items-center gap-2">
         <span className="text-xs font-medium text-gray-500">AI is thinking</span>
         <div className="flex items-center gap-1 ml-1">
           <span className="w-1.5 h-1.5 bg-[#8FCFA9] rounded-full animate-pulse"></span>

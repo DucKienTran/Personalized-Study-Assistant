@@ -3,6 +3,7 @@ import logging
 import time
 from typing import List
 import uuid
+import hashlib
 
 from fastapi import Response
 import jwt
@@ -33,56 +34,62 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 #  JWT TOKEN HANDLER
 SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = settings.JWT_ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
 
 
 def create_access_token(data: dict) -> str:
-    """
-    Tạo Access Token.
-    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
-    """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
     to_encode.update({"exp": expire, "token_type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(data: dict) -> str:
-    """
-    Tạo Refresh Token.
-    Payload 'data' truyền vào từ Service sẽ bao gồm: id, sub (email), role, jti
-    """
+def hash_token(token: str) -> str:
+    """Compute SHA-256 hash of a string token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_refresh_token(data: dict, expire_minutes: int) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=REFRESH_TOKEN_EXPIRE_MINUTES
-    )
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
     to_encode.update({"exp": expire, "token_type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def generate_tokens_pair(
-    user_id: int, email: str, role_name: str, permissions: List[str]
+    user_id: int,
+    email: str,
+    role_name: str,
+    permissions: list[str],
+    remember_me: bool = False,
 ) -> dict:
-    """
-    Hàm tạo cả cặp token Access & Refresh
-    """
-    token_jti = str(uuid.uuid4())
+    access_token = create_access_token(
+        data={
+            "id": user_id,
+            "sub": email,
+            "role": role_name,
+            "permissions": permissions,
+        }
+    )
 
-    access_payload = {
-        "id": user_id,
-        "sub": email,
-        "role": role_name,
-        "permissions": permissions,
-        "jti": token_jti,
-    }
-    refresh_payload = {"id": user_id, "sub": email, "jti": token_jti}
+    expire_minutes = (
+        settings.REFRESH_TOKEN_EXPIRE_MINUTES
+        if remember_me
+        else settings.REFRESH_TOKEN_SHORT_EXPIRE_MINUTES
+    )
+
+    jti = str(uuid.uuid4())
+    refresh_token = create_refresh_token(
+        data={"id": user_id, "jti": jti, "remember_me": remember_me},
+        expire_minutes=expire_minutes,
+    )
 
     return {
-        "access_token": create_access_token(access_payload),
-        "refresh_token": create_refresh_token(refresh_payload),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
-        "jti": token_jti,
+        "jti": jti,
     }
 
 
@@ -141,12 +148,15 @@ async def is_refresh_token_blacklisted(redis: Redis, token: str) -> bool:
     return bool(await redis.get(f"blacklist:refresh:{token}"))
 
 
-def set_refresh_cookie(response: Response, token: str) -> None:
+def set_refresh_cookie(
+    response: Response, token: str, remember_me: bool = False
+) -> None:
+    max_age = (settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60) if remember_me else None
     response.set_cookie(
         key="refresh_token",
         value=token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
         samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=max_age,
     )

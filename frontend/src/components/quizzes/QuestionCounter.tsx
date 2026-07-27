@@ -71,7 +71,7 @@ export default function QuestionCounter({
                                 setEditing(false);
                             }
                         }}
-                        className="w-full text-center outline-none"
+                        className="w-full text-center outline-hidden"
                     />
                 ) : (
                     <button

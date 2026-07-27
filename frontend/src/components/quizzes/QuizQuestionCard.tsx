@@ -179,12 +179,12 @@
         };
 
         return (
-            <div data-question-id={questionId} className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-visible">
+            <div data-question-id={questionId} className="bg-white/90 backdrop-blur-xs border border-gray-100 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-visible">
                 
                 {/* Tiêu đề câu hỏi */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                        <span className={`text-white font-bold rounded-lg px-2.5 py-1 text-xs shrink-0 mt-0.5 shadow-sm whitespace-nowrap ${
+                        <span className={`text-white font-bold rounded-lg px-2.5 py-1 text-xs shrink-0 mt-0.5 shadow-xs whitespace-nowrap ${
                             mode === "exam" ? "bg-purple-600" : "bg-blue-600"
                         }`}>
                             Câu {index + 1} {points ? `(${points}đ)` : ""}
@@ -201,7 +201,7 @@
                                 type="button"
                                 onMouseLeave={handleMouseLeaveHint}
                                 onClick={() => setShowHint((prev) => !prev)}
-                                className="p-1.5 hover:bg-amber-50 rounded-xl transition-all duration-200 focus:outline-none"
+                                className="p-1.5 hover:bg-amber-50 rounded-xl transition-all duration-200 focus:outline-hidden"
                                 aria-label="Gợi ý đáp án"
                             >
                                 <BulbIcon active={showHint} className="w-5 h-5" />
@@ -212,7 +212,7 @@
                                 <div
                                     onMouseEnter={handleMouseEnterHint}
                                     onMouseLeave={handleMouseLeaveHint}
-                                    className="absolute right-0 bottom-full mb-3 w-72 bg-gradient-to-br from-amber-50 to-white border border-amber-200 text-amber-900 text-xs rounded-2xl p-4 shadow-xl backdrop-blur-sm z-30 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                    className="absolute right-0 bottom-full mb-3 w-72 bg-linear-to-br from-amber-50 to-white border border-amber-200 text-amber-900 text-xs rounded-2xl p-4 shadow-xl backdrop-blur-xs z-30 animate-in fade-in slide-in-from-bottom-2 duration-200"
                                 >
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <span className="p-1 bg-amber-100 rounded-lg text-amber-600">
@@ -263,7 +263,7 @@
                                 type="button"
                                 disabled={isAnswered}
                                 onClick={() => onSelectOption(opt.id)}
-                                className={`w-full text-left p-4 rounded-xl border text-sm font-medium transition-all duration-150 transform active:scale-[0.99] shadow-sm ${buttonStyles}`}
+                                className={`w-full text-left p-4 rounded-xl border text-sm font-medium transition-all duration-150 transform active:scale-[0.99] shadow-xs ${buttonStyles}`}
                             >
                                 <div className="flex items-center gap-3">
                                     {/* Vòng tròn ký hiệu nhỏ trước đáp án */}

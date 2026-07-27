@@ -1,133 +1,343 @@
-  "use client";
+// src/app/login/page.tsx
+"use client";
 
-  import React, { useState } from "react";
-  import { useRouter } from "next/navigation";
-  import Link from "next/link";
-  import { authService } from "@/services/auth.service";
-  import RedirectLoading from "@/components/states/RedirectLoading";
-  import { APP_CONFIG } from "@/constants/app"; 
+import React, { Suspense, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
-  export default function LoginPage() {
-    const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+import { useAuth } from "@/hooks/useAuth";
 
-    const [showRedirectLoading, setShowRedirectLoading] = useState(false);
-    const [isAdminMode, setIsAdminMode] = useState(false);
-    const [clickCount, setClickCount] = useState(0);
+import RedirectLoading from "@/components/states/RedirectLoading";
+import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
 
-    const handleTitleClick = () => {
-      setClickCount((prev) => {
-        if (prev + 1 === 5) {
-          setIsAdminMode(true); 
-          return 0;
-        }
-        return prev + 1;
-      });
+import {
+  MailIcon,
+  LockIcon,
+  WarningIcon,
+  ProgressActivityIcon,
+  ArrowForwardIcon,
+} from "@/components/shared/icons";
+
+import { APP_CONFIG } from "@/constants/app";
+import { AUTH_ROUTES } from "@/constants/auth";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+
+interface ValidationErrorItem {
+  msg?: string;
+  loc?: (string | number)[];
+}
+
+interface ApiErrorResponse {
+  response?: {
+    status?: number;
+    data?: {
+      detail?: string | ValidationErrorItem[];
     };
+  };
+}
 
-    const handleSubmit = async (e: React.SyntheticEvent) => {
-      e.preventDefault();
-      setError("");
-      setLoading(true);
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login } = useAuth();
 
-      try {
-        const data = await authService.login(email, password);
-        localStorage.setItem("access_token", data.access_token);
-        setShowRedirectLoading(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
-        setTimeout(() => {
-          router.push("/"); 
-        }, 2000);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showRedirectLoading, setShowRedirectLoading] = useState(false);
 
-      } catch (err: any) {
-        const errorData = err.response?.data?.detail;
-        if (Array.isArray(errorData)) {
-          setError(errorData[0]?.msg || "Invalid input data.");
-        } else if (typeof errorData === "string") {
-          setError(errorData);
-        } else {
-          setError("Login failed. Please check your email or password!");
-        }
-        setLoading(false);
-      }
-    };
+  const redirectTarget = searchParams.get("redirect") || "/";
 
-    if (showRedirectLoading) {
-      return <RedirectLoading message="Login successful! Entering the system..." />;
+  const parseErrorMessage = (err: unknown): string => {
+    if (typeof err !== "object" || err === null) {
+      return "An unexpected error occurred. Please try again.";
     }
 
+    const apiError = err as ApiErrorResponse;
+
+    if (!apiError.response) {
+      return "Unable to connect to server. Please try again.";
+    }
+
+    const detail = apiError.response.data?.detail;
+
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    if (Array.isArray(detail) && detail.length > 0) {
+      const firstError = detail[0];
+
+      if (firstError?.msg) {
+        const field =
+          firstError.loc?.[1] != null
+            ? `${String(firstError.loc[1])}: `
+            : "";
+
+        return `${field}${firstError.msg}`;
+      }
+    }
+
+    switch (apiError.response.status) {
+      case 401:
+        return "Invalid email or password.";
+
+      case 422:
+        return "Validation failed. Please verify your input.";
+
+      case 429:
+        return "Too many login attempts. Please try again later.";
+
+      case 500:
+        return "Internal server error. Please try again later.";
+
+      default:
+        return "Login failed. Please try again.";
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+
+    if (loading) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      await login({
+        email: email.trim(),
+        password,
+        remember_me: rememberMe,
+      });
+
+      setShowRedirectLoading(true);
+
+      setTimeout(() => {
+        router.replace(redirectTarget);
+      }, 600);
+    } catch (err) {
+      setError(parseErrorMessage(err));
+      setLoading(false);
+    }
+  };
+
+  if (showRedirectLoading) {
     return (
-      <div className="w-screen h-screen overflow-hidden flex items-center justify-center bg-[#e6f4ea] font-sans m-0 p-4 select-none">
-        <div className="w-full max-w-[400px] bg-white p-8 sm:p-10 rounded-2xl shadow-sm border border-[#d2ebd9]">
-          
-          <div className="text-center mb-8">
-            <h1 
-              onClick={handleTitleClick}
-              className="text-[26px] font-semibold tracking-[1px] text-[#2e4a38] font-serif cursor-default select-none"
-            >
-              {APP_CONFIG.NAME} 
-            </h1>
-          </div>
-
-          {error && (
-            <div className="p-3 mb-5 text-[13px] font-medium text-[#991b1b] bg-[#fef2f2] border border-[#fca5a5] rounded-lg text-center">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-[13px] font-medium text-[#4a6351] mb-1.5">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-[#f9fbf9] border border-[#cbdcd0] rounded-lg text-[15px] text-black placeholder-[#a3b8ab] focus:outline-none focus:border-[#428a5d] focus:ring-1 focus:ring-[#428a5d] transition-all"
-                placeholder="user@example.com"
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-
-                                <label className="text-[13px] font-medium text-[#4a6351]">Password</label>
-                <a href="#" className="text-[12px] font-medium text-[#428a5d] hover:underline">Forgot password?</a>
-              </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-[#f9fbf9] border border-[#cbdcd0] rounded-lg text-[15px] text-black placeholder-[#a3b8ab] focus:outline-none focus:border-[#428a5d] focus:ring-1 focus:ring-[#428a5d] transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 bg-[#3b7a52] hover:bg-[#2e5f3f] text-white text-[14px] font-semibold rounded-lg shadow-sm transition-colors duration-150 disabled:bg-[#cbd5e1] disabled:cursor-not-allowed"
-              > {loading ? "Processing..." : "Log In"}
-              </button>
-            </div>
-          </form>
-
-                    <div className="mt-4 text-center text-[13px] text-[#6b8775]">
-            New user?{" "}
-            <Link 
-              href={isAdminMode ? "/register-admin" : "/register"} 
-              className="font-semibold text-[#3b7a52] hover:underline ml-1"
-            >
-              Create account
-            </Link>
-          </div>
-
-        </div>
-      </div>
+      <RedirectLoading message="Login successful! Entering the system..." />
     );
   }
+
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+
+      <AuthBackgroundPattern />
+
+      <div className="relative z-10 w-full max-w-md">
+
+        <Card className="border-border bg-card/95 shadow-sm backdrop-blur-md transition-shadow duration-200 hover:shadow-md">
+
+          <CardHeader className="space-y-3 text-center">
+
+            <CardTitle className="text-balance text-3xl font-bold tracking-tight text-foreground">
+              {APP_CONFIG.NAME}
+            </CardTitle>
+
+            <CardDescription className="text-sm leading-relaxed text-muted-foreground">              Sign in to continue your learning journey.
+            </CardDescription>
+
+          </CardHeader>
+
+          <CardContent>
+
+            {error && (
+              <div
+                role="alert"
+                className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+              >
+                <WarningIcon
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                />
+
+                <span className="leading-relaxed">
+                  {error}
+                </span>
+              </div>
+            )}
+
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-6"
+            >
+
+              <div className="space-y-2">
+
+                <Label htmlFor="email">
+                  Email address
+                </Label>
+
+                <div className="relative">
+
+                  <MailIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="user@example.com"
+                    value={email}
+                    onChange={(e) =>
+                      setEmail(e.target.value)
+                    }
+                    className="h-11 pl-10"
+                    required
+                  />
+
+                </div>
+
+              </div>
+
+              <div className="space-y-2">
+
+                <div className="flex items-center justify-between">
+
+                  <Label htmlFor="password">
+                    Password
+                  </Label>
+
+                  <Link
+                    href={AUTH_ROUTES.FORGOT_PASSWORD}
+                    className="text-sm font-medium text-primary transition-colors hover:text-[var(--primary-hover)]"
+                  >
+                    Forgot password?
+                  </Link>
+
+                </div>
+
+                <div className="relative">
+
+                  <LockIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) =>
+                      setPassword(e.target.value)
+                    }
+                    className="h-11 pl-10"
+                    required
+                  />
+
+                </div>
+
+              </div>              <div className="flex items-center justify-between">
+
+                <div className="flex items-center space-x-2">
+
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) =>
+                      setRememberMe(Boolean(checked))
+                    }
+                  />
+
+                  <Label
+                    htmlFor="remember-me"
+                    className="cursor-pointer text-sm font-normal text-muted-foreground"
+                  >
+                    Remember me
+                  </Label>
+
+                </div>
+
+              </div>
+
+              <Button
+                type="submit"
+                size="lg"
+                className="h-11 w-full gap-2"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <ProgressActivityIcon
+                      size={18}
+                      className="animate-spin"
+                    />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Log in</span>
+
+                    <ArrowForwardIcon
+                      size={18}
+                      className="transition-transform duration-200 group-hover/button:translate-x-1"
+                    />
+                  </>
+                )}
+              </Button>
+
+            </form>
+
+            <div className="mt-8 border-t border-border pt-6 text-center text-sm text-muted-foreground">
+
+              New to LearningAid?{" "}
+
+              <Link
+                href={AUTH_ROUTES.REGISTER}
+                className="font-semibold text-primary transition-colors hover:text-[var(--primary-hover)]"
+              >
+                Create account
+              </Link>
+
+            </div>
+
+          </CardContent>
+
+        </Card>
+
+      </div>
+
+    </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <RedirectLoading message="Loading..." />
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}

@@ -98,7 +98,7 @@ export default function ProcessingQuizBanner({
     if (quizzes.length === 0 || !isVisible) return null;
 
     return (
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-sm relative">
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-xs relative">
             
             {/* Nút X đóng banner với hiệu ứng hover và active */}
             <button
@@ -134,7 +134,7 @@ export default function ProcessingQuizBanner({
                     return (
                         <div
                             key={quiz.id}
-                            className="bg-white rounded-xl border border-indigo-100 p-4 shadow-sm"
+                            className="bg-white rounded-xl border border-indigo-100 p-4 shadow-xs"
                         >
                             <div className="flex items-start justify-between gap-4 mb-3">
                                 <div className="min-w-0">
@@ -219,8 +219,8 @@ export default function ProcessingQuizBanner({
                                 <div
                                     className={`h-full rounded-full transition-[width] duration-500 ease-linear ${
                                         isCompleted
-                                            ? "bg-gradient-to-r from-emerald-500 to-green-500"
-                                            : "bg-gradient-to-r from-indigo-500 to-sky-500"
+                                            ? "bg-linear-to-r from-emerald-500 to-green-500"
+                                            : "bg-linear-to-r from-indigo-500 to-sky-500"
                                     }`}
                                     style={{
                                         width: `${progress}%`,

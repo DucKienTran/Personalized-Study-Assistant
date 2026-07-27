@@ -68,7 +68,7 @@ export default function SummaryPickerPage() {
                     <p className="text-sm text-gray-500">Bạn chưa tải lên tài liệu nào.</p>
                     <button
                         onClick={() => window.dispatchEvent(new Event("open-upload-modal"))}
-                        className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] text-white rounded-lg shadow-sm"
+                        className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] text-white rounded-lg shadow-xs"
                     >
                         Tải tài liệu lên
                     </button>

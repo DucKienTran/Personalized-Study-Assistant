@@ -266,14 +266,14 @@ export default function DocumentSummaryPage() {
                                 onChange={(e) => setInstruction(e.target.value)}
                                 placeholder="Ví dụ: tập trung vào phần công thức, bỏ qua phần giới thiệu..."
                                 rows={2}
-                                className="w-full text-xs bg-transparent p-2.5 focus:outline-none resize-none placeholder:text-gray-400"
+                                className="w-full text-xs bg-transparent p-2.5 focus:outline-hidden resize-none placeholder:text-gray-400"
                             />
                         </div>
                     )}
                 </div>
 
                 <button onClick={handleGenerate} disabled={loading}
-                    className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-sm transition-colors">
+                    className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-xs transition-colors">
                     {loading ? "Đang tạo..." : summary ? "Tạo lại" : "Tạo tóm tắt"}
                 </button>
             </div>
@@ -289,7 +289,7 @@ export default function DocumentSummaryPage() {
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 placeholder={defaultTitle}
-                                className="flex-1 text-sm text-gray-800 placeholder:text-gray-400 bg-transparent focus:outline-none"
+                                className="flex-1 text-sm text-gray-800 placeholder:text-gray-400 bg-transparent focus:outline-hidden"
                             />
                         </div>
                         <button
@@ -318,9 +318,9 @@ export default function DocumentSummaryPage() {
 
                 {loading && (
                     <div className="space-y-3">
-                        <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse" />
-                        <div className="h-4 bg-gray-100 rounded w-full animate-pulse" />
-                        <div className="h-4 bg-gray-100 rounded w-5/6 animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded-sm w-3/4 animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded-sm w-full animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded-sm w-5/6 animate-pulse" />
                     </div>
                 )}
 
@@ -389,7 +389,7 @@ export default function DocumentSummaryPage() {
 
             {/* Modal xác nhận trùng tên */}
             {duplicateTarget && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
                         <p className="text-sm text-gray-700">
                             Bản tóm tắt <span className="font-semibold">&quot;{duplicateTarget.title}&quot;</span> đã tồn tại, bạn có muốn tạo bản ghi mới không?

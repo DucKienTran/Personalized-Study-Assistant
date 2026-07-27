@@ -9,6 +9,7 @@ from sqlalchemy.orm import configure_mappers
 from sqlalchemy.sql import text
 
 from app.api.auth import router as auth_router
+from app.api.conversation import router as conversation_router
 from app.api.documents import router as documents_router
 from app.api.quizzes import attempts_router as quiz_attempts_router
 from app.api.quizzes import router as quizzes_router
@@ -127,6 +128,7 @@ app.include_router(documents_router, prefix=settings.API_STR)
 app.include_router(quizzes_router, prefix=settings.API_STR)
 app.include_router(quiz_attempts_router, prefix=settings.API_STR)
 app.include_router(rag_router, prefix=settings.API_STR)
+app.include_router(conversation_router, prefix=settings.API_STR)
 
 
 @app.get("/")

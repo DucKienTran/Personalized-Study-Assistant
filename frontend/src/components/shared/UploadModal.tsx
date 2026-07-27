@@ -51,7 +51,7 @@ export default function UploadModal({ isOpen, onClose, onUploaded }: UploadModal
     };
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-base font-bold text-gray-900">Tải tệp tài liệu mới lên</h2>
@@ -99,7 +99,7 @@ export default function UploadModal({ isOpen, onClose, onUploaded }: UploadModal
                     <button
                         onClick={handleConfirm}
                         disabled={!file || uploading}
-                        className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-sm"
+                        className="px-4 py-2 text-xs font-medium bg-[#3b7a52] hover:bg-[#2e5f3f] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-xs"
                     >
                         {uploading ? "Đang tải lên..." : "Xác nhận"}
                     </button>

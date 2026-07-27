@@ -55,7 +55,7 @@ export default function ExamSidebar({
     };
 
     return (
-        <div className="bg-white/95 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-sm space-y-5">
+        <div className="bg-white/95 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-xs space-y-5">
             
             {/* 1. Đồng hồ đếm ngược & Chỉ số vi phạm */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -130,8 +130,8 @@ export default function ExamSidebar({
                                 {/* Trạng thái cờ đánh dấu (Chỉ hiển thị khi chưa nộp bài) */}
                                 {!isSubmitted && (isRev || isCrit) && (
                                     <div className="absolute -top-1 -right-1 flex gap-0.5">
-                                        {isCrit && <span className="w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white shadow-sm" title="Câu quan trọng / Nghi ngờ sai" />}
-                                        {isRev && <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-white shadow-sm" title="Câu cần xem lại" />}
+                                        {isCrit && <span className="w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white shadow-xs" title="Câu quan trọng / Nghi ngờ sai" />}
+                                        {isRev && <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-white shadow-xs" title="Câu cần xem lại" />}
                                     </div>
                                 )}
                             </button>
@@ -181,7 +181,7 @@ export default function ExamSidebar({
                     type="button"
                     onClick={onSubmit}
                     disabled={submitting}
-                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition-all active:scale-95 disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition-all active:scale-95 disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
                 >
                     {submitting ? (
                         <>

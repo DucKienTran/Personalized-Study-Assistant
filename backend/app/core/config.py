@@ -66,9 +66,11 @@ class Settings(BaseSettings):
 
     # expired time
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080  # Default long duration (7 days)
+    REFRESH_TOKEN_SHORT_EXPIRE_MINUTES: int = 480
     ONLINE_STATUS_EXPIRE_SECONDS: int = 300
-
+    PENDING_REGISTER_TTL_SECONDS: int = 900
+    PASSWORD_RESET_TTL_SECONDS: int = 900
     # AI model
     GEMINI_MODEL: str
 
@@ -77,6 +79,13 @@ class Settings(BaseSettings):
 
     # Rag
     RAG_TOP_K: int = 5
+
+    # SMTP Settings
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_APP_PASSWORD: str = ""
+    FRONTEND_URL: str = "http://localhost:3000"
 
 
 settings = Settings()

@@ -1,6 +1,9 @@
-import { CitationSource } from "@/types/chat";
+import { CitationSource, ConversationDetail, ConversationSummary } from "@/types/chat";
 import { apiFetch } from "./api-fetch";
-
+import {
+    RAGQueryRequest,
+    RetrievalMetadata
+} from "@/types/chat";
 interface BackendCitationSource {
   index: number;
   document_id: number;
@@ -12,171 +15,260 @@ interface BackendCitationSource {
   snippet?: string;
 }
 
-
+export type CitationMap = Record<string, number>;
 export interface StreamCallbacks {
-  onSources?: (sources: CitationSource[]) => void;
-  onToken?: (token: string) => void;
-  onError?: (errorMessage: string) => void;
-  onDone?: () => void;
+    onConversationId?: (id: number) => void; 
+    onCitationMap?: (map: Record<string, number>) => void;
+    onSources?: (
+        sources: CitationSource[]
+    ) => void;
+
+
+    onToken?: (
+        token: string
+    ) => void;
+
+
+    onMetadata?: (
+        metadata: RetrievalMetadata
+    ) => void;
+
+
+    onError?: (
+        errorMessage:string
+    ) => void;
+
+
+    onDone?:()=>void;
+}
+
+export function mapCitationSource(source: BackendCitationSource): CitationSource {
+  return {
+    index: source.index,
+    documentId: source.document_id,
+    documentTitle: source.document_title,
+    pageStart: source.page_start,
+    pageEnd: source.page_end,
+    headerPath: source.header_path || [],
+    chunkId: source.chunk_id,
+    snippet: source.snippet,
+  };
 }
 
 class ChatService {
-  private mapCitationSource(
-    source: BackendCitationSource
-  ): CitationSource {
+  async listConversations(): Promise<ConversationSummary[]> {
+    const res = await apiFetch("/conversations", { method: "GET" });
+    if (!res.ok) throw new Error("Failed to load conversations");
+    const data = await res.json();
+    return data.map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      updatedAt: c.updated_at,
+    }));
+  }
+
+  async getConversation(id: number): Promise<ConversationDetail> {
+    const res = await apiFetch(`/conversations/${id}`, { method: "GET" });
+    if (!res.ok) throw new Error("Failed to load conversation");
+    const data = await res.json();
     return {
-      index: source.index,
-      documentId: source.document_id,
-      documentTitle: source.document_title,
-      pageStart: source.page_start,
-      pageEnd: source.page_end,
-      headerPath: source.header_path || [],
-      chunkId: source.chunk_id,
-      snippet: source.snippet,
+      id: data.id,
+      title: data.title,
+      messages: data.messages.map((m: any) => ({
+        id: m.id,
+        sender: m.sender,
+        content: m.content,
+        sourcesJson: m.sources_json,
+        createdAt: m.created_at,
+      })),
     };
+  }
+
+  async renameConversation(id: number, title: string): Promise<ConversationSummary> {
+    const res = await apiFetch(`/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) throw new Error("Failed to rename conversation");
+    const data = await res.json();
+    return { id: data.id, title: data.title, updatedAt: data.updated_at };
+  }
+
+  async deleteConversation(id: number): Promise<void> {
+    const res = await apiFetch(`/conversations/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete conversation");
   }
 
   async streamQuestion(
-    question: string,
-    callbacks: StreamCallbacks
+      payload: RAGQueryRequest,
+      callbacks: StreamCallbacks
   ): Promise<void> {
-    const response = await apiFetch(
-      "/rag/stream",
-      {
-        method:"POST",
-        body: JSON.stringify({
-          question
-        }),
-      }
-    );
-
-    if (!response.ok || !response.body) {
-      throw new Error(
-        `Streaming request failed with status ${response.status}`
+      const response = await apiFetch(
+          "/rag/stream",
+          {
+              method: "POST",
+              body: JSON.stringify({
+                  query: payload.query,
+                  document_ids: payload.documentIds,
+                  top_k: payload.topK ?? 5,
+                  chat_history: payload.chatHistory,
+                  conversation_id: payload.conversationId,
+              }),
+          }
       );
-    }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    let buffer = "";
-    let doneCalled = false;
-
-    const notifyDone = () => {
-      if (!doneCalled) {
-        doneCalled = true;
-        callbacks.onDone?.();
+      if (!response.ok || !response.body) {
+        throw new Error(
+          `Streaming request failed with status ${response.status}`
+        );
       }
-    };
 
-    while (true) {
-      const { value, done } = await reader.read();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
 
-      if (done) break;
+      let buffer = "";
+      let doneCalled = false;
 
-      buffer += decoder.decode(value, {
-        stream: true,
-      });
+      const notifyDone = () => {
+        if (!doneCalled) {
+          doneCalled = true;
+          callbacks.onDone?.();
+        }
+      };
 
-      // SSE event kết thúc bằng \n\n
-      const events = buffer.split("\n\n");
+      while (true) {
+        const { value, done } = await reader.read();
 
-      // Giữ lại event chưa hoàn thành
-      buffer = events.pop() || "";
+        if (done) break;
 
-      for (const eventBlock of events) {
-        if (!eventBlock.trim()) continue;
+        buffer += decoder.decode(value, {
+          stream: true,
+        });
 
-        let eventType = "";
-        const dataLines: string[] = [];
+        // SSE event kết thúc bằng \n\n
+        const events = buffer.split("\n\n");
 
-        for (const line of eventBlock.split("\n")) {
-          if (line.startsWith("event:")) {
-            eventType = line
-              .replace("event:", "")
-              .trim();
+        // Giữ lại event chưa hoàn thành
+        buffer = events.pop() || "";
+
+        for (const eventBlock of events) {
+          if (!eventBlock.trim()) continue;
+
+          let eventType = "";
+          const dataLines: string[] = [];
+
+          for (const line of eventBlock.split("\n")) {
+            if (line.startsWith("event:")) {
+              eventType = line
+                .replace("event:", "")
+                .trim();
+            }
+
+            if (line.startsWith("data:")) {
+              dataLines.push(
+                line.replace("data:", "").trim()
+              );
+            }
           }
 
-          if (line.startsWith("data:")) {
-            dataLines.push(
-              line.replace("data:", "").trim()
+          const rawData = dataLines.join("\n");
+
+          if (!rawData) continue;
+
+          try {
+            switch (eventType) {
+              case "conversation_id": {
+                const parsed = JSON.parse(rawData);
+                callbacks.onConversationId?.(parsed.id);
+                break;
+              }
+              case "citation_map": {
+                const parsed = JSON.parse(rawData);
+                const rawMap: Record<string, number> =
+                  Array.isArray(parsed) ? {} : parsed.data || parsed;
+
+                callbacks.onCitationMap?.(rawMap);
+                break;
+              }
+              case "sources": {
+                const parsed = JSON.parse(rawData);
+
+                // Support:
+                // 1. [...]
+                // 2. { data: [...] }
+                const rawSources: BackendCitationSource[] =
+                  Array.isArray(parsed)
+                    ? parsed
+                    : parsed.data || [];
+
+                callbacks.onSources?.(
+                  rawSources.map((source) =>
+                    mapCitationSource(source)
+                  )
+                );
+
+                break;
+              }
+
+              case "token": {
+                let token = rawData;
+
+                try {
+                  const parsed = JSON.parse(rawData);
+
+                  if (typeof parsed === "string") {
+                    token = parsed;
+                  } else if (parsed.content) {
+                    token = parsed.content;
+                  }
+                } catch {
+                  // raw text token
+                }
+
+                callbacks.onToken?.(token);
+                break;
+              }
+
+              case "error": {
+                const parsed = JSON.parse(rawData);
+
+                callbacks.onError?.(
+                  parsed.message || "Streaming error occurred"
+                );
+
+                break;
+              }
+
+              case "done": {
+                notifyDone();
+                break;
+              }
+
+              case "metadata": {
+                const parsed = JSON.parse(rawData);
+                callbacks.onMetadata?.({
+                  originalQuery: parsed.original_query,
+                  rewrittenQuery: parsed.rewritten_query,
+                  retrievedChunks: parsed.retrieved_chunks,
+                  contextChunks: parsed.context_chunks,
+                  usedReranker: parsed.used_reranker,
+                });
+                break;
+              }
+            }
+          } catch (error) {
+            console.error(
+              "[ChatService] SSE parse error:",
+              error,
+              rawData
             );
           }
         }
-
-        const rawData = dataLines.join("\n");
-
-        if (!rawData) continue;
-
-        try {
-          switch (eventType) {
-            case "sources": {
-              const parsed = JSON.parse(rawData);
-
-              // Support:
-              // 1. [...]
-              // 2. { data: [...] }
-              const rawSources: BackendCitationSource[] =
-                Array.isArray(parsed)
-                  ? parsed
-                  : parsed.data || [];
-
-              callbacks.onSources?.(
-                rawSources.map((source) =>
-                  this.mapCitationSource(source)
-                )
-              );
-
-              break;
-            }
-
-            case "token": {
-              let token = rawData;
-
-              try {
-                const parsed = JSON.parse(rawData);
-
-                if (typeof parsed === "string") {
-                  token = parsed;
-                } else if (parsed.content) {
-                  token = parsed.content;
-                }
-              } catch {
-                // raw text token
-              }
-
-              callbacks.onToken?.(token);
-              break;
-            }
-
-            case "error": {
-              const parsed = JSON.parse(rawData);
-
-              callbacks.onError?.(
-                parsed.message || "Streaming error occurred"
-              );
-
-              break;
-            }
-
-            case "done": {
-              notifyDone();
-              break;
-            }
-          }
-        } catch (error) {
-          console.error(
-            "[ChatService] SSE parse error:",
-            error,
-            rawData
-          );
-        }
       }
+
+      // Stream đóng tự nhiên nhưng backend không gửi done
+      notifyDone();
     }
-
-    // Stream đóng tự nhiên nhưng backend không gửi done
-    notifyDone();
   }
-}
 
-export const chatService = new ChatService();
+  export const chatService = new ChatService();

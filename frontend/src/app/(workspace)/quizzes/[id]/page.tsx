@@ -340,9 +340,9 @@ export default function QuizDoingPage({ params }: Props) {
             <div className="relative max-w-4xl mx-auto px-4 pt-8 flex flex-col z-10">
                 
                 {/* KHỐI HEADER TRANG LÀM BÀI */}
-                <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-6 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-6 shadow-xs mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2.5 shadow-sm ${
+                        <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2.5 shadow-xs ${
                             quiz.mode === "exam" 
                                 ? "bg-purple-100 text-purple-800 border border-purple-200" 
                                 : "bg-blue-100 text-blue-800 border border-blue-200"
@@ -359,7 +359,7 @@ export default function QuizDoingPage({ params }: Props) {
                                 router.push("/quizzes"); 
                             }
                         }}
-                        className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 hover:border-red-300 text-red-600 hover:text-red-700 text-sm font-medium rounded-xl transition-all duration-150 transform active:scale-95 whitespace-nowrap shadow-sm"
+                        className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 hover:border-red-300 text-red-600 hover:text-red-700 text-sm font-medium rounded-xl transition-all duration-150 transform active:scale-95 whitespace-nowrap shadow-xs"
                     >
                         Rời khỏi
                     </button>
@@ -367,7 +367,7 @@ export default function QuizDoingPage({ params }: Props) {
 
                 {/* KHỐI KẾT QUẢ THI CỬ */}
                 {quiz.mode === "study" && isStudyCompleted && (
-                    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 border border-emerald-400 rounded-2xl p-6 shadow-md text-white mb-6">
+                    <div className="bg-linear-to-r from-emerald-500 to-teal-600 border border-emerald-400 rounded-2xl p-6 shadow-md text-white mb-6">
                         <h2 className="text-lg font-bold mb-2">
                             Bạn đã hoàn thành bài ôn tập
                         </h2>
@@ -427,7 +427,7 @@ export default function QuizDoingPage({ params }: Props) {
                 </div>
 
                 {/* THANH TIẾN ĐỘ */}
-                <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-5 shadow-sm mt-8 space-y-2.5">
+                <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-5 shadow-xs mt-8 space-y-2.5">
                     <div className="flex items-center justify-between text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <span>{showCorrectAnswers ? "Kết quả chính xác đạt được" : "Tiến độ làm bài"}</span>
                         <span className={quiz.mode === "exam" && !isSubmitted ? "text-purple-600 font-extrabold" : "text-blue-600 font-extrabold"}>
@@ -458,7 +458,7 @@ export default function QuizDoingPage({ params }: Props) {
                         <button
                             type="button"
                             onClick={handleResetQuiz}
-                            className="px-6 py-3 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-sm transition-all duration-150 transform active:scale-95 shadow-sm hover:shadow"
+                            className="px-6 py-3 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-sm transition-all duration-150 transform active:scale-95 shadow-xs hover:shadow-sm"
                         >
                             Làm lại từ đầu
                         </button>
@@ -469,7 +469,7 @@ export default function QuizDoingPage({ params }: Props) {
                             type="button"
                             onClick={handleSubmitExam}
                             disabled={submitting}
-                            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm transition-all duration-150 transform active:scale-95 shadow-md disabled:opacity-50"
+                            className="px-6 py-3 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm transition-all duration-150 transform active:scale-95 shadow-md disabled:opacity-50"
                         >
                             {submitting ? "Đang chấm bài..." : "Nộp bài thi"}
                         </button>

@@ -10,6 +10,9 @@ class RetrievalResult:
     text: str
     vector_score: float | None = None
     bm25_score: float | None = None
+    retrieval_score: float | None = None  # RRF fusion score
+    rerank_score: float | None = None
+    rank: int | None = None
     page_start: int = 0
     page_end: int = 0
     header_path: list[str] = field(default_factory=list)

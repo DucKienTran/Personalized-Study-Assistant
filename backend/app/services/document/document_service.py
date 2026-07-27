@@ -5,6 +5,9 @@ from uuid import uuid4
 
 from bson import ObjectId
 from sqlalchemy.orm import Session
+from chromadb.api import ClientAPI
+from redis.asyncio import Redis
+from app.core.config import settings
 
 from app.exceptions.base import BadRequestError
 from app.models.document_model import Document
@@ -15,10 +18,19 @@ SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
 
 # abc
 class DocumentService:
-    def __init__(self, sql_db: Session, mongo_db, storage_service: StorageService):
+    def __init__(
+        self,
+        sql_db: Session,
+        mongo_db,
+        storage_service: StorageService,
+        chroma_client: ClientAPI,
+        redis: Redis,
+    ):
         self.sql_db = sql_db
         self.mongo_collection = mongo_db["parsed_documents"]
         self.storage_service = storage_service
+        self.chroma_client = chroma_client
+        self.redis = redis
 
     def _get_unique_title(self, user_id: int, base_title: str) -> str:
         existing_titles = {
@@ -162,14 +174,31 @@ class DocumentService:
 
         return [row.id for row in rows]
 
-    async def delete_document(self, document_id: int, user_id: int) -> bool:
-        doc = (
-            self.sql_db.query(Document)
-            .filter(Document.id == document_id, Document.user_id == user_id)
-            .first()
-        )
-        if not doc:
-            return False
-        self.sql_db.delete(doc)
-        self.sql_db.commit()
-        return True
+
+async def delete_document(self, document_id: int, user_id: int) -> bool:
+    doc = (
+        self.sql_db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == user_id)
+        .first()
+    )
+    if not doc:
+        return False
+
+    chroma_collection = self.chroma_client.get_or_create_collection(
+        name=settings.CHROMA_COLLECTION_NAME
+    )
+    chroma_collection.delete(where={"document_id": document_id})
+
+    if doc.mongo_id:
+        try:
+            target_id = ObjectId(doc.mongo_id)
+        except Exception:
+            target_id = doc.mongo_id
+        await self.mongo_collection.delete_one({"_id": target_id})
+
+    self.sql_db.delete(doc)
+    self.sql_db.commit()
+
+    await self.redis.incr(f"rag:bm25:version:{user_id}")
+
+    return True

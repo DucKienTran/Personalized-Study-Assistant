@@ -43,7 +43,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
     const timer = setInterval(() => {
       setThinkingIndex((i) => (i + 1) % THINKING_MESSAGES.length);
-    }, 1200);
+    }, 2000);
 
     return () => clearInterval(timer);
   }, [isThinking]);
@@ -96,7 +96,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       {/* Message */}
       <div className={isUser ? "max-w-[80%]" : "flex-1 min-w-0"}>
         <div
-          className={`rounded-2xl border shadow-sm transition-colors ${
+          className={`rounded-2xl border shadow-xs transition-colors ${
             isUser
               ? "border-[#B9DFC7] bg-[#CFEBD8] text-[#173D2A]"
               : isError
@@ -107,7 +107,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <div className="px-5 py-4">
             {isThinking ? (
               <p className="text-sm italic text-gray-500">
-                {THINKING_MESSAGES[thinkingIndex]}
+                {THINKING_MESSAGES[thinkingIndex]
+                  .split("")
+                  .map((char, index) => (
+                    <span
+                      key={index}
+                      className="thinking-char"
+                      style={{
+                        animationDelay: `${index * 80}ms`,
+                      }}
+                    >
+                      {char === " " ? "\u00A0" : char}
+                    </span>
+                  ))}
               </p>
             ) : (
               <MarkdownRenderer

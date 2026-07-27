@@ -43,20 +43,19 @@ PERMISSIONS = [
     },
 ]
 
+# Example snippet update for seed script
 USERS = [
     {
-        "username": "Admin_1",
-        "email": "admin@gmail.com",
-        "password": "Admin@1234",
-        "full_name": "System Administrator",
-        "role": "admin",
+        "email": "admin@example.com",
+        "password": "AdminPassword123!",
+        "full_name": "System Admin",
+        "role_name": "admin",
     },
     {
-        "username": "Kien_Tran",
-        "email": "tranduckien0110@gmail.com",
-        "password": "Abcd@1234",
-        "full_name": "Kien Tran",
-        "role": "client",
+        "email": "client@example.com",
+        "password": "ClientPassword123!",
+        "full_name": "Standard User",
+        "role_name": "client",
     },
 ]
 

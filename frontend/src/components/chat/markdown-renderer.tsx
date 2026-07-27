@@ -77,7 +77,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                     e.currentTarget
                   )
                 }
-                className="rounded px-1 font-semibold text-[#2E8B57] hover:bg-[#DCFCE7]"
+                className="rounded-sm px-1 font-semibold text-[#2E8B57] hover:bg-[#DCFCE7]"
               >
                 [{index}]
               </button>

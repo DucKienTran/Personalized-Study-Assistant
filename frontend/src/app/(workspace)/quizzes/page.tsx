@@ -221,9 +221,9 @@ export default function QuizzesPage() {
                             <button
                                 key={item.id}
                                 onClick={() => { setSelectedTypeId(item.id); setIsCreateModalOpen(true); }}
-                                className={`group relative border rounded-2xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-300 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-1 h-[140px] overflow-hidden ${colorStyle.bg}`}
+                                className={`group relative border rounded-2xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-300 shadow-xs cursor-pointer hover:shadow-md hover:-translate-y-1 h-[140px] overflow-hidden ${colorStyle.bg}`}
                             >
-                                <div className={`p-2 bg-white rounded-xl inline-block border border-gray-100 shadow-sm transition-transform duration-300 group-hover:scale-110 ${colorStyle.icon}`}>
+                                <div className={`p-2 bg-white rounded-xl inline-block border border-gray-100 shadow-xs transition-transform duration-300 group-hover:scale-110 ${colorStyle.icon}`}>
                                     {renderQuizIcon(item.iconId)}
                                 </div>
                                 <span className="text-sm font-bold text-gray-900 block mt-1">{item.title}</span>
@@ -248,7 +248,7 @@ export default function QuizzesPage() {
 
             {isCreateModalOpen && (
                 <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
                     onClick={() => setIsCreateModalOpen(false)}
                 >
                     <div 
@@ -271,7 +271,7 @@ export default function QuizzesPage() {
                             <StudyExamTabs value={mode} onChange={setMode} />
 
                             {/* Phần điền thông tin: Nối liền mạch với tab được chọn, không có khoảng hở hay viền trắng */}
-                            <div className={`border-x border-b rounded-b-2xl p-6 space-y-6 transition-colors duration-200 -mt-[1px] ${
+                            <div className={`border-x border-b rounded-b-2xl p-6 space-y-6 transition-colors duration-200 -mt-px ${
                                 mode === "study" 
                                     ? "bg-blue-100 border-blue-300" 
                                     : "bg-purple-100 border-purple-300"
@@ -285,7 +285,7 @@ export default function QuizzesPage() {
                                     <select
                                         value={selectedDocId}
                                         onChange={(e) => setSelectedDocId(e.target.value ? Number(e.target.value) : "")}
-                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 bg-white transition ${
+                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-hidden focus:ring-2 bg-white transition ${
                                             mode === "exam" 
                                                 ? "border-purple-200 focus:ring-purple-600 focus:border-purple-400" 
                                                 : "border-blue-200 focus:ring-blue-600 focus:border-blue-400"
@@ -348,7 +348,7 @@ export default function QuizzesPage() {
                                                         type="number" min="1" max="100"
                                                         value={totalQuestions}
                                                         onChange={(e) => setTotalQuestions(Number(e.target.value))}
-                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-600"
                                                     />
                                                 </div>
 
@@ -369,7 +369,7 @@ export default function QuizzesPage() {
                                                     <select
                                                         value={difficulty}
                                                         onChange={(e) => setDifficulty(e.target.value as any)}
-                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-600"
                                                     >
                                                         <option value="easy">Dễ (Easy)</option>
                                                         <option value="medium">Trung bình (Medium)</option>
@@ -390,7 +390,7 @@ export default function QuizzesPage() {
                                                             type="number" min="1" max="100"
                                                             value={totalQuestions}
                                                             onChange={(e) => setTotalQuestions(Number(e.target.value))}
-                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-600"
                                                         />
                                                     </div>
 
@@ -403,7 +403,7 @@ export default function QuizzesPage() {
                                                             value={targetTotalPoints}
                                                             onChange={(e) => setTargetTotalPoints(e.target.value)}
                                                             placeholder="Nhập hoặc chọn..."
-                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-600"
                                                         />
                                                         <datalist id="points-preset">
                                                             <option value="10" />
@@ -432,7 +432,7 @@ export default function QuizzesPage() {
                                                     <select
                                                         value={difficulty}
                                                         onChange={(e) => setDifficulty(e.target.value as any)}
-                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-600"
                                                     >
                                                         <option value="easy">Dễ (Easy)</option>
                                                         <option value="medium">Trung bình (Medium)</option>
@@ -479,7 +479,7 @@ export default function QuizzesPage() {
                                                 value={customInstruction}
                                                 onChange={(e) => setCustomInstruction(e.target.value)}
                                                 placeholder="Ví dụ: Chỉ quét nội dung chương 3, diễn giải chi tiết bằng tiếng Việt..."
-                                                className={`w-full h-24 rounded-xl border p-3 text-sm focus:outline-none focus:ring-2 mt-3 resize-none bg-white shadow-inner ${
+                                                className={`w-full h-24 rounded-xl border p-3 text-sm focus:outline-hidden focus:ring-2 mt-3 resize-none bg-white shadow-inner ${
                                                     mode === "exam" ? "border-purple-200 focus:ring-purple-600" : "border-blue-200 focus:ring-blue-600"
                                                 }`}
                                             />
@@ -504,7 +504,7 @@ export default function QuizzesPage() {
                                 type="button"
                                 onClick={handleGenerateQuiz}
                                 disabled={generating || !selectedDocId || (currentTypeConfig.generationMode === "custom" && selectedCustomTypes.length === 0)}
-                                className={`font-bold px-6 py-2.5 rounded-xl text-sm transition-all border-2 bg-white disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 disabled:scale-100 shadow-sm transform active:scale-95 ${
+                                className={`font-bold px-6 py-2.5 rounded-xl text-sm transition-all border-2 bg-white disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 disabled:scale-100 shadow-xs transform active:scale-95 ${
                                     mode === "exam" 
                                         ? "border-purple-800 text-purple-800 hover:bg-purple-50 active:bg-purple-100" 
                                         : "border-blue-800 text-blue-800 hover:bg-blue-50 active:bg-blue-100"

@@ -1,23 +1,32 @@
 import type { Metadata } from "next";
-import { APP_CONFIG } from "@/constants/app";
+import { AuthProvider } from "../contexts/AuthContext";
 import "./globals.css";
+import { Inter } from "next/font/google";
+import { cn } from "@/lib/utils";
 
-// Tiêu đề và Mô tả hiển thị trên thẻ Tab trình duyệt
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+
 export const metadata: Metadata = {
-  title: `${APP_CONFIG.NAME} - Nền tảng học tập thông minh`,
-  description: "Ứng dụng hỗ trợ học tập tích hợp AI.",
+  title: "Application",
+  description: "Web application dashboard",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="vi">
-      <body className="antialiased text-gray-900 bg-gray-50">
-        {/* Children ở đây sẽ là trang Login, Register, hoặc Dashboard tùy URL */}
-        {children}
+    <html lang="en" className={cn("font-sans", inter.variable)}>
+      <head>
+        {/* Nạp Google Material Symbols Font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        />
+      </head>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

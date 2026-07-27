@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
  * Toast dùng chung toàn hệ thống.
  *
  * LÝ DO TỒN TẠI: window.alert()/window.confirm() là dialog native của trình duyệt,
- * khi bật lên sẽ khiến window bắn sự kiện `blur` thật (mất focus cấp OS/browser-chrome),
+ * khi bật lên sẽ khiến window bắn sự kiện `blur-sm` thật (mất focus cấp OS/browser-chrome),
  * gây tính nhầm vi phạm trong cơ chế chống gian lận Exam Mode. Toast render thuần trong
  * DOM của trang nên KHÔNG bao giờ gây window.blur.
  *
@@ -151,7 +151,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
 export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
     if (toasts.length === 0) return null;
     return (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-2 px-4 w-full pointer-events-none">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-60 flex flex-col items-center gap-2 px-4 w-full pointer-events-none">
             {toasts.map((t) => (
                 <ToastCard key={t.id} toast={t} onDismiss={onDismiss} />
             ))}

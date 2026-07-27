@@ -17,3 +17,13 @@ export function formatPageRange(
 
   return `Page ${pageStart} - ${pageEnd}`;
 }
+
+export function remapCitations(
+  renderedText: string,
+  citationMap: Record<string, number>
+): string {
+  return renderedText.replace(/\[(\d+)\]/g, (match, num) => {
+    const newNum = citationMap[num];
+    return newNum !== undefined ? `[${newNum}]` : "";
+  });
+}

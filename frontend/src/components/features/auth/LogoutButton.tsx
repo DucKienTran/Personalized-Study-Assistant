@@ -20,7 +20,7 @@ export default function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="px-6 py-2.5 bg-[#991b1b] hover:bg-[#7f1d1d] text-white text-[14px] font-medium rounded-lg shadow-sm transition-colors duration-200"
+      className="px-6 py-2.5 bg-[#991b1b] hover:bg-[#7f1d1d] text-white text-[14px] font-medium rounded-lg shadow-xs transition-colors duration-200"
     >
       Đăng xuất
     </button>

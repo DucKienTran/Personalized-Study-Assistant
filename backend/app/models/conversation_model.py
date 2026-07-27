@@ -1,0 +1,32 @@
+from datetime import datetime, timezone
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.core.database import Base  # adjust import to match your actual Base location
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc)
+    )
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id"), index=True
+    )
+    sender: Mapped[str] = mapped_column(String(10))  # "user" | "ai"
+    content: Mapped[str] = mapped_column(Text)
+    sources_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc))   
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
