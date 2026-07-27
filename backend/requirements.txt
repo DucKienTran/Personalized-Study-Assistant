@@ -27,6 +27,7 @@ durationpy==0.10
 email-validator==2.3.0
 fastapi==0.137.1
 filelock==3.31.1
+flashrank
 flatbuffers==25.12.19
 frozenlist==1.8.0
 fsspec==2026.6.0

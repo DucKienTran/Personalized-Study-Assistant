@@ -87,4 +87,5 @@ class Settings(BaseSettings):
     SMTP_APP_PASSWORD: str = ""
     FRONTEND_URL: str = "http://localhost:3000"
 
+
 settings = Settings()

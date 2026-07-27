@@ -35,6 +35,7 @@ from app.services.ai.rag_service import RAGService
 from app.services.ai.retrieval_service import RetrievalService
 from app.services.ai.summary_service import SummaryService
 from app.services.auth_service import AuthService
+from app.services.conversation_service import ConversationService
 from app.services.document.document_processing_service import DocumentProcessingService
 from app.services.document.document_service import DocumentService
 from app.services.document.parser import DocumentParserService
@@ -52,6 +53,7 @@ security = HTTPBearer()
 # ==========================================
 # 1. BASE / INFRASTRUCTURE DEPENDENCIES
 # ==========================================
+
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -134,13 +136,13 @@ EmbeddingClientDep = Annotated[BaseEmbeddingClient, Depends(get_embedding_client
 # 2. SECURITY & AUTH DEPENDENCIES
 # ==========================================
 
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     redis: RedisDep,
 ) -> CurrentUser:
     token = credentials.credentials
     payload = decode_token(token, expected_type="access", raise_on_error=True)
-
     user_id = payload.get("id")
     email = payload.get("sub")
     role_name = payload.get("role")
@@ -186,6 +188,7 @@ class PermissionChecker:
 # 3. SERVICE DEPENDENCIES
 # ==========================================
 
+
 def get_presence_service(redis: RedisDep) -> PresenceService:
     return PresenceService(redis)
 
@@ -220,9 +223,7 @@ async def get_document_parser_service() -> DocumentParserService:
     return DocumentParserService()
 
 
-DocumentParserServiceDep = Annotated[
-    DocumentParserService, Depends(get_document_parser_service)
-]
+DocumentParserServiceDep = Annotated[DocumentParserService, Depends(get_document_parser_service)]
 
 
 def get_embedding_service(
@@ -260,11 +261,15 @@ def get_document_service(
     db: DbSession,
     mongo_db: MongoDbDep,
     storage_service: StorageServiceDep,
+    chroma_client: ChromaClientDep,
+    redis: RedisDep,
 ) -> DocumentService:
     return DocumentService(
         sql_db=db,
         mongo_db=mongo_db,
         storage_service=storage_service,
+        chroma_client=chroma_client,
+        redis=redis,
     )
 
 
@@ -278,6 +283,7 @@ def get_document_processing_service(
     parser_service: DocumentParserServiceDep,
     storage_service: StorageServiceDep,
     llm_client: LLMClientDep,
+    redis: RedisDep,
 ) -> DocumentProcessingService:
     return DocumentProcessingService(
         sql_db=db,
@@ -286,6 +292,7 @@ def get_document_processing_service(
         parser_service=parser_service,
         storage_service=storage_service,
         llm_client=llm_client,
+        redis=redis,
     )
 
 
@@ -301,9 +308,7 @@ def get_summary_record_service(
     return SummaryRecordService(sql_db=db, mongo_db=mongo_db)
 
 
-SummaryRecordServiceDep = Annotated[
-    SummaryRecordService, Depends(get_summary_record_service)
-]
+SummaryRecordServiceDep = Annotated[SummaryRecordService, Depends(get_summary_record_service)]
 
 
 def get_quiz_service(
@@ -320,10 +325,12 @@ QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service)]
 def get_retrieval_service(
     chroma_client: ChromaClientDep,
     embedding_service: EmbeddingServiceDep,
+    redis: RedisDep,
 ) -> RetrievalService:
     return RetrievalService(
         chroma_client=chroma_client,
         embedding_service=embedding_service,
+        redis=redis,
     )
 
 
@@ -341,3 +348,10 @@ def get_rag_service(
 
 
 RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
+
+
+def get_conversation_service() -> ConversationService:
+    return ConversationService()
+
+
+ConversationServiceDep = Annotated[ConversationService, Depends(get_conversation_service)]

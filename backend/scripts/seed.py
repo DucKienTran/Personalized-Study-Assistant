@@ -60,8 +60,6 @@ USERS = [
 ]
 
 
-
-
 def seed_roles(db: Session):
     print("Seeding roles...")
 
