@@ -98,7 +98,7 @@ export default function QuizTypeCard({
                                 "flex flex-col items-center justify-center gap-3",
                                 active
                                     ? `${color.active} ring-2 ring-offset-1 ring-gray-200`
-                                    : "border-gray-200 bg-white hover:border-gray-300 hover:-translate-y-0.5 hover:shadow-sm",
+                                    : "border-gray-200 bg-white hover:border-gray-300 hover:-translate-y-0.5 hover:shadow-xs",
                             ].join(" ")}
                         >
                             <div

@@ -175,7 +175,7 @@ export default function QuizDoingPage({ params }: Props) {
 
         return () => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
-            window.removeEventListener("blur", handleBlur);
+            window.removeEventListener("blur-sm", handleBlur);
             document.removeEventListener("mouseleave", handleMouseLeave);
             window.removeEventListener("resize", handleResize);
         };
@@ -472,9 +472,9 @@ export default function QuizDoingPage({ params }: Props) {
             <div className="relative max-w-6xl mx-auto px-4 pt-8 z-10">
                 
                 {/* TIÊU ĐỀ PHÒNG THI / PHÒNG HỌC */}
-                <div className="bg-white/95 backdrop-blur-md border border-purple-100 rounded-2xl p-6 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="bg-white/95 backdrop-blur-md border border-purple-100 rounded-2xl p-6 shadow-xs mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2.5 shadow-sm ${
+                        <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2.5 shadow-xs ${
                             quiz.mode === "exam" 
                                 ? "bg-purple-100 text-purple-800 border border-purple-200" 
                                 : "bg-blue-100 text-blue-800 border border-blue-200"
@@ -487,7 +487,7 @@ export default function QuizDoingPage({ params }: Props) {
                     {isSubmitted ? (
                         <button
                             onClick={() => router.push("/quizzes")}
-                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-sm"
+                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-xs"
                         >
                             Rời khỏi
                         </button>
@@ -496,7 +496,7 @@ export default function QuizDoingPage({ params }: Props) {
                             idleLabel="Rời khỏi"
                             armedLabel="Bấm lần nữa để rời (mất tiến trình)"
                             onConfirm={() => router.push("/quizzes")}
-                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-sm"
+                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-xs"
                             armedClassName="px-4 py-2 bg-red-600 text-white border border-red-600 text-sm font-medium rounded-xl shadow-md"
                         />
                     )}
@@ -504,7 +504,7 @@ export default function QuizDoingPage({ params }: Props) {
 
                 {/* HIỂN THỊ KẾT QUẢ SAU KHI HOÀN THÀNH (STUDY MODE) */}
                 {quiz.mode === "study" && isStudyCompleted && (
-                    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 border border-emerald-400 rounded-2xl p-6 shadow-md text-white mb-6">
+                    <div className="bg-linear-to-r from-emerald-500 to-teal-600 border border-emerald-400 rounded-2xl p-6 shadow-md text-white mb-6">
                         <h2 className="text-lg font-bold mb-2">Bạn đã hoàn thành bài ôn tập!</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                             <div className="bg-white/10 rounded-xl p-3 text-center">
@@ -528,7 +528,7 @@ export default function QuizDoingPage({ params }: Props) {
 
                 {/* HIỂN THỊ KẾT QUẢ KHI NỘP THÀNH CÔNG (EXAM MODE) */}
                 {quiz.mode === "exam" && isSubmitted && examResult && (
-                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-400 rounded-2xl p-6 shadow-md text-white mb-6">
+                    <div className="bg-linear-to-r from-purple-600 to-indigo-600 border border-purple-400 rounded-2xl p-6 shadow-md text-white mb-6">
                         <h2 className="text-lg font-bold mb-1">Báo cáo kết quả bài kiểm tra chính thức</h2>
                         <p className="text-xs text-purple-100 mb-4">Hồ sơ điểm thi đã được tự động lưu trữ trên cơ sở dữ liệu hệ thống.</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -580,7 +580,7 @@ export default function QuizDoingPage({ params }: Props) {
                                     />
 
                                     {/* PHÍM ĐIỀU HƯỚNG DƯỚI CÂU HỎI */}
-                                    <div className="bg-white/95 backdrop-blur-sm border border-purple-100 p-4 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-3">
+                                    <div className="bg-white/95 backdrop-blur-xs border border-purple-100 p-4 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
@@ -595,7 +595,7 @@ export default function QuizDoingPage({ params }: Props) {
                                                 <button
                                                     type="button"
                                                     onClick={() => setCurrentIndex((p) => p + 1)}
-                                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                                                 >
                                                     Câu tiếp theo →
                                                 </button>
@@ -605,7 +605,7 @@ export default function QuizDoingPage({ params }: Props) {
                                                         idleLabel="Nộp bài thi"
                                                         armedLabel={submitArmedLabel}
                                                         onConfirm={doSubmitExam}
-                                                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl text-xs font-bold shadow-md transition"
+                                                        className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 text-white rounded-xl text-xs font-bold shadow-md transition"
                                                         armedClassName="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md transition"
                                                     />
                                                 )
@@ -690,7 +690,7 @@ export default function QuizDoingPage({ params }: Props) {
                         </div>
 
                         {/* THANH TIẾN ĐỘ CHẾ ĐỘ HỌC */}
-                        <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-5 shadow-sm mt-8 space-y-2.5">
+                        <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-5 shadow-xs mt-8 space-y-2.5">
                             <div className="flex items-center justify-between text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 <span>{showCorrectAnswers ? "Kết quả chính xác đạt được" : "Tiến độ làm bài"}</span>
                                 <span className="text-blue-600 font-extrabold">
@@ -714,8 +714,8 @@ export default function QuizDoingPage({ params }: Props) {
                                 idleLabel="Làm lại từ đầu"
                                 armedLabel="Bấm lần nữa để xóa hết & làm lại"
                                 onConfirm={doResetQuiz}
-                                className="px-6 py-3 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-sm transition-all shadow-sm"
-                                armedClassName="px-6 py-3 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-sm transition-all shadow-sm"
+                                className="px-6 py-3 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-sm transition-all shadow-xs"
+                                armedClassName="px-6 py-3 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-sm transition-all shadow-xs"
                             />
                         </div>
 
