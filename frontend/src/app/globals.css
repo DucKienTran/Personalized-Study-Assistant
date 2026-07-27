@@ -1,13 +1,261 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================
+   Theme Mapping (Tailwind v4)
+   ========================================================== */
+
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-sans);
+
+  /* Core colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-destructive: var(--destructive);
+
+  /* Sidebar */
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Charts */
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Radius */
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ==========================================================
+   Design Tokens (Light)
+   ========================================================== */
+
+:root {
+  /* Brand */
+
+  --primary: #1e6e4b;
+  --primary-hover: #185a3d;
+  --primary-active: #124430;
+  --primary-tint: #e7f3ec;
+  --primary-foreground: #ffffff;
+
+  /* Surface */
+
+  --background: #f6f8f6;
+  --foreground: #16241c;
+
+  --card: #ffffff;
+  --card-foreground: #16241c;
+
+  --popover: #ffffff;
+  --popover-foreground: #16241c;
+
+  /* Secondary */
+
+  --secondary: #eef3ef;
+  --secondary-foreground: #16241c;
+
+  --muted: #eef3ef;
+  --muted-foreground: #5b6e62;
+
+  /* Accent */
+
+  --accent: #c9772e;
+  --accent-foreground: #ffffff;
+
+  /* Semantic */
+
+  --destructive: #dc2626;
+
+  /* Inputs */
+
+  --border: #e2e9e4;
+  --input: #e2e9e4;
+  --ring: #1e6e4b;
+
+  /* Radius */
+
+  --radius: 0.75rem;
+
+  /* Sidebar */
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #16241c;
+
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+
+  --sidebar-accent: var(--primary-tint);
+  --sidebar-accent-foreground: var(--primary);
+
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Charts */
+
+  --chart-1: #1e6e4b;
+  --chart-2: #3b7a52;
+  --chart-3: #6d987d;
+  --chart-4: #97b8a3;
+  --chart-5: #c9ddd0;
+
+  /* Utilities */
+
+  --primary-shadow: rgb(30 110 75 / 0.15);
+}
+
+/* ==========================================================
+   Design Tokens (Dark)
+   ========================================================== */
+
+.dark {
+  --background: #101714;
+  --foreground: #edf4ef;
+
+  --card: #18231d;
+  --card-foreground: #edf4ef;
+
+  --popover: #18231d;
+  --popover-foreground: #edf4ef;
+
+  --primary: #5ca980;
+  --primary-hover: #71b68f;
+  --primary-active: #4c946f;
+  --primary-tint: rgb(92 169 128 / 0.15);
+  --primary-foreground: #08100c;
+
+  --secondary: #223128;
+  --secondary-foreground: #edf4ef;
+
+  --muted: #223128;
+  --muted-foreground: #9eb4a7;
+
+  --accent: #d7924d;
+  --accent-foreground: #08100c;
+
+  --destructive: #ef4444;
+
+  --border: #2a3930;
+  --input: #2a3930;
+  --ring: #5ca980;
+
+  --sidebar: #18231d;
+  --sidebar-foreground: #edf4ef;
+
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+
+  --sidebar-accent: #223128;
+  --sidebar-accent-foreground: var(--primary);
+
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --chart-1: #5ca980;
+  --chart-2: #77bf97;
+  --chart-3: #9fd1b4;
+  --chart-4: #bddfc8;
+  --chart-5: #dbeee2;
+
+  --primary-shadow: rgb(92 169 128 / 0.2);
+}
+
+/* ==========================================================
+   Tailwind v4 Compatibility
+   ========================================================== */
+
+@layer base {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* ==========================================================
+   Utilities
+   ========================================================== */
+
 .citation-highlight {
+  background: var(--primary-tint);
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-shadow);
+  transition: all 200ms ease;
+}
 
-    background: #DCFCE7;
+@keyframes thinking-wave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
 
-    border-color: #69B989 !important;
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
 
-    box-shadow: 0 0 0 3px rgba(105,185,137,.15);
-
-    transition: all .25s;
+.thinking-char {
+  display: inline-block;
+  animation: thinking-wave 1.2s ease-in-out infinite;
 }
