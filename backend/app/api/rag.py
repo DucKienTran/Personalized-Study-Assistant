@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, status
-
-from fastapi.responses import StreamingResponse
+# app/api/v1/endpoints/rag_router.py
 import json
 
-from app.core.config import settings
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+
 from app.core.dependencies import (
     CurrentUserDep,
     DbSession,
@@ -11,108 +11,103 @@ from app.core.dependencies import (
     RAGServiceDep,
     get_current_user,
 )
-from app.schemas.rag_schema import (
-    RAGQueryRequest,
-    RAGQueryResponse,
-)
-from app.schemas.response_schema import BaseResponse
+from app.schemas.rag_schema import RAGQueryRequest, RAGQueryResponse
+from app.services.conversation_service import ConversationService
 
-router = APIRouter(
-    prefix="/rag",
-    tags=["RAG"],
-    dependencies=[Depends(get_current_user)],
-)
+router = APIRouter(prefix="/rag", tags=["Rag"], dependencies=[Depends(get_current_user)])
+
+conversation_service = ConversationService()
 
 
-@router.post(
-    "/ask",
-    response_model=BaseResponse[RAGQueryResponse],
-    status_code=status.HTTP_200_OK,
-)
-async def ask_question(
-    request: RAGQueryRequest,
-    db: DbSession,
+def _resolve_document_ids(
+    payload_doc_ids: list[int] | None,
+    user_doc_ids: list[int],
+) -> list[int]:
+    if not payload_doc_ids:
+        return user_doc_ids
+    valid_set = set(user_doc_ids)
+    return [doc_id for doc_id in payload_doc_ids if doc_id in valid_set]
+
+
+@router.post("/query", response_model=RAGQueryResponse)
+async def query_rag(
+    payload: RAGQueryRequest,
     current_user: CurrentUserDep,
-    document_service: DocumentServiceDep,
+    db: DbSession,
     rag_service: RAGServiceDep,
-):
-    document_ids = document_service.list_document_ids(
+    document_service: DocumentServiceDep,
+) -> RAGQueryResponse:
+    user_doc_ids = document_service.list_document_ids(user_id=current_user.id)
+    target_doc_ids = _resolve_document_ids(payload.document_ids, user_doc_ids)
+
+    return await rag_service.answer_question(
+        query=payload.query,
         user_id=current_user.id,
-    )
-
-    if not document_ids:
-        return BaseResponse(
-            data=RAGQueryResponse(
-                answer=(
-                    "Bạn chưa có tài liệu nào sẵn sàng để trò chuyện. "
-                    "Hãy tải lên tài liệu hoặc đợi quá trình xử lý hoàn tất."
-                ),
-                sources=[],
-            )
-        )
-
-    response = await rag_service.answer_question(
-        query=request.question,
         sql_db=db,
-        document_ids=document_ids,
-        top_k=settings.RAG_TOP_K,
+        document_ids=target_doc_ids,
+        top_k=payload.top_k,
+        chat_history=payload.chat_history,
     )
 
-    return BaseResponse(data=response)
 
-
-@router.post(
-    "/stream",
-    status_code=status.HTTP_200_OK,
-)
-async def stream_question(
-    request: RAGQueryRequest,
-    db: DbSession,
+@router.post("/stream")
+async def stream_query_rag(
+    payload: RAGQueryRequest,
     current_user: CurrentUserDep,
-    document_service: DocumentServiceDep,
+    db: DbSession,
     rag_service: RAGServiceDep,
+    document_service: DocumentServiceDep,
 ):
-    document_ids = document_service.list_document_ids(
-        user_id=current_user.id,
-    )
+    user_doc_ids = document_service.list_document_ids(user_id=current_user.id)
+    target_doc_ids = _resolve_document_ids(payload.document_ids, user_doc_ids)
 
-    if not document_ids:
+    if payload.conversation_id:
+        conv = conversation_service.get_conversation(db, current_user.id, payload.conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        conversation_id = conv.id
+    else:
+        conv = conversation_service.create_conversation(
+            db, current_user.id, title=payload.query[:60]
+        )
+        conversation_id = conv.id
 
-        async def empty_stream():
+    conversation_service.add_message(db, conversation_id, sender="user", content=payload.query)
+    async def event_generator():
+        full_answer_parts: list[str] = []
+        final_sources: list = []
+        yield f"event: conversation_id\ndata: {json.dumps({'id': conversation_id})}\n\n"
+
+        async for chunk in rag_service.stream_answer_question(
+            query=payload.query,
+            user_id=current_user.id,
+            sql_db=db,
+            document_ids=target_doc_ids,
+            top_k=payload.top_k,
+            chat_history=payload.chat_history,
+        ):
+            if chunk["type"] == "token":
+                full_answer_parts.append(chunk["content"])
+            if chunk["type"] == "sources":
+                final_sources = chunk["data"]
+            if chunk["type"] == "conversation_id":
+                pass  # unreachable, placeholder for clarity
+
+            event_type = chunk["type"]
+            payload_data = chunk.get("data")
+            if payload_data is None:
+                payload_data = chunk.get("content")
+
             yield (
-                "event: error\n"
-                f"data: {json.dumps({'message': 'No documents available'}, ensure_ascii=False)}\n\n"
+                f"event: {event_type}\n" f"data: {json.dumps(payload_data, ensure_ascii=False)}\n\n"
             )
 
-        return StreamingResponse(
-            empty_stream(),
-            media_type="text/event-stream",
+        conversation_service.add_message(
+            db,
+            conversation_id,
+            sender="ai",
+            content="".join(full_answer_parts),
+            sources_json=json.dumps(final_sources, ensure_ascii=False),
         )
 
-    async def event_generator():
-        try:
-            async for event in rag_service.stream_answer_question(
-                query=request.question,
-                sql_db=db,
-                document_ids=document_ids,
-                top_k=settings.RAG_TOP_K,
-            ):
-                yield (
-                    f"event: {event['type']}\n"
-                    f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-                )
-
-        except Exception as exc:
-            yield (
-                "event: error\n"
-                f"data: {json.dumps({'message': str(exc)}, ensure_ascii=False)}\n\n"
-            )
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
