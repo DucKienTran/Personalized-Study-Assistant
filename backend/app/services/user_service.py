@@ -23,8 +23,8 @@ from app.exceptions import (
 )
 from app.models.user_model import User
 from app.schemas.user_schema import ChangePassword, CurrentUser
-from app.services.token_service import TokenService
 from app.services.presence_service import PresenceService
+from app.services.token_service import TokenService
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,36 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+
 import { authService } from "@/services/auth.service";
+
 import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
+
 import { UserRegister } from "@/types";
+
+import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+
+import {
+  MailIcon,
+  LockIcon,
+  PersonIcon,
+  WarningIcon,
+  CheckCircleIcon,
+  ProgressActivityIcon,
+  ArrowForwardIcon,
+} from "@/components/shared/icons";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 interface ValidationErrorItem {
   loc?: (string | number)[];
@@ -37,16 +63,13 @@ export default function RegisterPage() {
       const apiErr = err as ApiErrorResponse;
       const detail = apiErr.response?.data?.detail;
 
-      // Handle standard string error response (e.g. 400 Bad Request, 409 Conflict)
       if (typeof detail === "string") {
         return detail;
       }
 
-      // Handle FastAPI 422 Unprocessable Entity array
       if (Array.isArray(detail) && detail.length > 0) {
         const firstErr = detail[0];
         if (firstErr?.msg) {
-          // Extract field name from loc array (e.g., ["body", "email"] -> "email")
           const fieldName = firstErr.loc?.[1] ? `${firstErr.loc[1]}: ` : "";
           return `${fieldName}${firstErr.msg}`;
         }
@@ -56,14 +79,13 @@ export default function RegisterPage() {
   };
 
   const validateForm = (): boolean => {
-    // 1. Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!emailRegex.test(email.trim())) {
       setError("email: Please enter a valid email address.");
       return false;
     }
 
-    // 2. Password strength validation
     if (password.length < 8) {
       setError("password: Must be at least 8 characters long.");
       return false;
@@ -71,14 +93,14 @@ export default function RegisterPage() {
 
     const hasLetter = /[a-zA-Z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
+
     if (!hasLetter || !hasNumber) {
       setError("password: Must contain at least one letter and one number.");
       return false;
     }
 
-    // 3. Confirm password match
     if (password !== confirmPassword) {
-      setError("confirm_password: Passwords do not match!");
+      setError("confirm_password: Passwords do not match.");
       return false;
     }
 
@@ -89,6 +111,7 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (loading) return;
+
     setError("");
 
     if (!validateForm()) return;
@@ -98,157 +121,222 @@ export default function RegisterPage() {
     try {
       const payload: UserRegister = {
         email: email.trim(),
-        password: password,
+        password,
         confirm_password: confirmPassword,
         full_name: fullName.trim() || null,
       };
 
       await authService.register(payload);
       setIsSuccess(true);
-    } catch (err: unknown) {
+    } catch (err) {
       setError(parseErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // Success state view
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#faf5ff] p-4 select-none">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff] text-center space-y-6 animate-fade-in">
-          <div className="w-16 h-16 bg-[#f3e8ff] text-[#7c3aed] rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
-            ✓
-          </div>
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+        <AuthBackgroundPattern />
 
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-[#581c87]">
-              Registration Successful
-            </h1>
-            <p className="text-[15px] text-[#6b21a8] leading-relaxed font-medium">
-              Please check your email to verify your account.
-            </p>
-          </div>
+        <div className="relative z-10 w-full max-w-md">
+          <Card className="border-border bg-card/95 shadow-sm text-center">
+            <CardHeader className="space-y-3">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <CheckCircleIcon size={32} />
+              </div>
 
-          <div className="pt-2">
-            <Link
-              href={AUTH_ROUTES?.LOGIN || "/login"}
-              className="inline-block w-full py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-[14px] font-semibold rounded-full shadow-sm transition-colors duration-150"
-            >
-              Go to Login
-            </Link>
-          </div>
+              <CardTitle className="text-2xl font-bold text-foreground text-balance">
+                Check your email
+              </CardTitle>
+
+              <CardDescription className="text-sm leading-relaxed text-muted-foreground">
+                We&apos;ve sent a verification email to
+              </CardDescription>
+
+              <p className="break-all font-semibold text-foreground">{email}</p>
+            </CardHeader>
+
+            <CardContent>
+              <div className="rounded-xl border border-border bg-muted p-4 text-left">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  If this email is awaiting verification, a new verification
+                  email has been sent.
+                </p>
+
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  Open your inbox and click the verification link to activate
+                  your account before signing in.
+                </p>
+              </div>
+
+              <Button
+                size="lg"
+                className="mt-6 h-11 w-full"
+                render={<Link href={AUTH_ROUTES.LOGIN} />}
+              >
+                Back to login
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setIsSuccess(false)}
+                className="mt-4 text-sm font-medium text-primary transition-colors hover:text-[var(--primary-hover)]"
+              >
+                Use another email
+              </button>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#faf5ff] p-4 select-none">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff]">
-        
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#581c87] mb-2">
-            {APP_CONFIG.NAME}
-          </h1>
-          <p className="text-sm text-[#7e22ce]">Create your new account</p>
-        </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+      <AuthBackgroundPattern />
 
-        {/* Error Banner with Field Prefix support */}
-        {error && (
-          <div
-            role="alert"
-            className="p-3 mb-5 text-[13px] font-medium text-[#991b1b] bg-[#fef2f2] border border-[#fca5a5] rounded-lg text-center animate-fade-in capitalize-first"
-          >
-            {error}
-          </div>
-        )}
+      <div className="relative z-10 w-full max-w-md">
+        <Card className="border-border bg-card/95 shadow-sm backdrop-blur-md transition-shadow duration-200 hover:shadow-md">
+          <CardHeader className="space-y-3 text-center">
+            <CardTitle className="text-balance text-3xl font-bold tracking-tight text-foreground">
+              {APP_CONFIG.NAME}
+            </CardTitle>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">
-              Full Name (Optional)
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]"
-              placeholder="John Doe"
-              autoComplete="name"
-            />
-          </div>
+            <CardDescription className="text-sm leading-relaxed text-muted-foreground">
+              Create your account to get started.
+            </CardDescription>
+          </CardHeader>
 
-          <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]"
-              placeholder="name@example.com"
-              autoComplete="email"
-            />
-          </div>
+          <CardContent>
+            {error && (
+              <div
+                role="alert"
+                className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+              >
+                <WarningIcon size={18} className="mt-0.5 shrink-0" />
+                <span className="leading-relaxed">{error}</span>
+              </div>
+            )}
 
-          <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]"
-              placeholder="Min. 8 chars, letter & number"
-              autoComplete="new-password"
-            />
-          </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="full-name">
+                  Full name <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
 
-          <div className="relative border-b border-[#e9d5ff] focus-within:border-[#7c3aed] transition-colors duration-200 pb-1.5">
-            <label className="block text-[13px] font-medium text-[#6b21a8] mb-1">
-              Confirm password
-            </label>
-            <input
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-transparent text-[15px] text-black focus:outline-none placeholder-[#d8b4fe]"
-              placeholder="••••••••"
-              autoComplete="new-password"
-            />
-          </div>
+                <div className="relative">
+                  <PersonIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-[14px] font-semibold rounded-full shadow-sm transition-colors duration-150 disabled:bg-[#cbd5e1] disabled:cursor-not-allowed"
-            >
-              {loading ? "Processing..." : "Register"}
-            </button>
-          </div>
-        </form>
+                  <Input
+                    id="full-name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="h-11 pl-10"
+                  />
+                </div>
+              </div>
 
-        {/* Footer Link */}
-        <div className="text-center mt-6 text-[13px] text-[#6b21a8]">
-          Already have an account?{" "}
-          <Link
-            href={AUTH_ROUTES?.LOGIN || "/login"}
-            className="font-semibold text-[#7c3aed] hover:underline"
-          >
-            Log in now
-          </Link>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
 
+                <div className="relative">
+                  <MailIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="user@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-11 pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+
+                <div className="relative">
+                  <LockIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Minimum 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+
+                <div className="relative">
+                  <LockIcon
+                    size={18}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Repeat your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-11 pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" size="lg" className="h-11 w-full gap-2" disabled={loading}>
+                {loading ? (
+                  <>
+                    <ProgressActivityIcon size={18} className="animate-spin" />
+                    <span>Creating account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create account</span>
+                    <ArrowForwardIcon size={18} className="transition-transform duration-200 group-hover/button:translate-x-1" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-8 border-t border-border pt-6 text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link
+                href={AUTH_ROUTES.LOGIN}
+                className="font-semibold text-primary transition-colors hover:text-[var(--primary-hover)]"
+              >
+                Log in
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </main>
   );
 }

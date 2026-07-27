@@ -3,9 +3,20 @@
 import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+
 import { authService } from "@/services/auth.service";
 import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
+
+import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+import {
+  CheckCircleIcon,
+  CancelIcon,
+  ProgressActivityIcon,
+} from "@/components/shared/icons";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ValidationErrorItem {
   loc?: (string | number)[];
@@ -29,8 +40,7 @@ function VerifyEmailContent() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [errorMessage, setErrorMessage] = useState("");
   const [countdown, setCountdown] = useState(5);
-  
-  // Prevent duplicate API execution in React 18 Strict Mode
+
   const verificationAttempted = useRef(false);
 
   const parseErrorMessage = (err: unknown): string => {
@@ -76,7 +86,6 @@ function VerifyEmailContent() {
     executeVerification();
   }, [token]);
 
-  // Countdown and Auto-redirect on success
   useEffect(() => {
     if (status !== "success") return;
 
@@ -95,90 +104,86 @@ function VerifyEmailContent() {
   }, [status, router]);
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff] text-center select-none">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[#581c87] mb-2">{APP_CONFIG.NAME}</h1>
-        <p className="text-sm text-[#7e22ce]">Account Verification</p>
-      </div>
+    <Card className="w-full max-w-md border-border bg-card/95 shadow-sm text-center">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
+          {APP_CONFIG.NAME}
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">Account verification</p>
+      </CardHeader>
 
-      {/* State 1: Verifying */}
-      {status === "verifying" && (
-        <div className="py-8 space-y-4">
-          <div className="w-12 h-12 border-4 border-[#e9d5ff] border-t-[#7c3aed] rounded-full animate-spin mx-auto" />
-          <p className="text-[15px] font-medium text-[#6b21a8]">
-            Verifying your email address...
-          </p>
-        </div>
-      )}
-
-      {/* State 2: Success */}
-      {status === "success" && (
-        <div className="py-4 space-y-6 animate-fade-in">
-          <div className="w-16 h-16 bg-[#f3e8ff] text-[#7c3aed] rounded-full flex items-center justify-center mx-auto text-3xl font-bold">
-            ✓
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-[#581c87]">Email Verified!</h2>
-            <p className="text-[14px] text-[#6b21a8] font-medium leading-relaxed">
-              Your account is now active. Redirecting to login in{" "}
-              <span className="font-bold text-[#7c3aed]">{countdown}s</span>...
+      <CardContent>
+        {status === "verifying" && (
+          <div className="space-y-4 py-4">
+            <ProgressActivityIcon size={40} className="mx-auto animate-spin text-primary" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Verifying your email address...
             </p>
           </div>
+        )}
 
-          <div className="pt-2">
-            <button
-              onClick={() => router.push(AUTH_ROUTES?.LOGIN || "/login")}
-              className="w-full py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-[14px] font-semibold rounded-full shadow-sm transition-colors duration-150"
+        {status === "success" && (
+          <div className="space-y-6 py-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CheckCircleIcon size={32} />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">Email Verified!</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Your account is now active. Redirecting to login in{" "}
+                <span className="font-semibold text-primary">{countdown}s</span>...
+              </p>
+            </div>
+
+            <Button size="lg" className="h-11 w-full" onClick={() => router.push(AUTH_ROUTES?.LOGIN || "/login")}>
+              Go to login now
+            </Button>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="space-y-6 py-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <CancelIcon size={32} />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">Verification Failed</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">{errorMessage}</p>
+            </div>
+
+            <Button
+              size="lg"
+              className="h-11 w-full"
+              render={<Link href={AUTH_ROUTES?.LOGIN || "/login"} />}
             >
-              Go to Login Now
-            </button>
+              Back to login
+            </Button>
           </div>
-        </div>
-      )}
-
-      {/* State 3: Error */}
-      {status === "error" && (
-        <div className="py-4 space-y-6 animate-fade-in">
-          <div className="w-16 h-16 bg-[#fef2f2] text-[#dc2626] rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
-            ✕
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-[#991b1b]">Verification Failed</h2>
-            <p className="text-[14px] text-[#7f1d1d] font-medium leading-relaxed">
-              {errorMessage}
-            </p>
-          </div>
-
-          <div className="pt-2 space-y-3">
-            <Link
-              href={AUTH_ROUTES?.LOGIN || "/login"}
-              className="block w-full py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-[14px] font-semibold rounded-full shadow-sm transition-colors duration-150"
-            >
-              Back to Login
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#faf5ff] p-4">
-      <Suspense
-        fallback={
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-[#f3e8ff] text-center">
-            <div className="w-10 h-10 border-4 border-[#e9d5ff] border-t-[#7c3aed] rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-[#6b21a8] font-medium">Loading...</p>
-          </div>
-        }
-      >
-        <VerifyEmailContent />
-      </Suspense>
-    </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+      <AuthBackgroundPattern />
+
+      <div className="relative z-10 w-full max-w-md">
+        <Suspense
+          fallback={
+            <Card className="w-full max-w-md border-border bg-card/95 shadow-sm p-8 text-center">
+              <ProgressActivityIcon size={32} className="mx-auto animate-spin text-primary" />
+              <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
+            </Card>
+          }
+        >
+          <VerifyEmailContent />
+        </Suspense>
+      </div>
+    </main>
   );
 }

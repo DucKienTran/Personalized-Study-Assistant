@@ -87,9 +87,7 @@ async def refresh_token(
 ):
     result = await service.refresh(refresh_token, request)
     remember_me = result.pop("remember_me", False)
-    set_refresh_cookie(
-        response, result.pop("refresh_token"), remember_me=remember_me
-    )
+    set_refresh_cookie(response, result.pop("refresh_token"), remember_me=remember_me)
     return result
 
 

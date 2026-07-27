@@ -59,7 +59,9 @@ class AuthService:
         )
 
     # auth_service.py — sửa lại register()
-    async def register(self, user_data: UserRegister, role_name: str = "client") -> dict:
+    async def register(
+        self, user_data: UserRegister, role_name: str = "client"
+    ) -> dict:
         uniform_message = {
             "detail": "If this email is valid, a message with next steps has been sent."
         }
@@ -69,7 +71,9 @@ class AuthService:
             return uniform_message
         await self.redis.setex(ratelimit_key, 60, "1")
 
-        existing_user = self.db.query(User).filter(User.email == user_data.email).first()
+        existing_user = (
+            self.db.query(User).filter(User.email == user_data.email).first()
+        )
         if existing_user:
             logger.info(f"Registration attempted for existing email: {user_data.email}")
             await self.email_service.send_already_registered_email(
@@ -97,11 +101,15 @@ class AuthService:
 
         redis_key = f"pending_register:{token_hash}"
         await self.redis.setex(
-            redis_key, settings.PENDING_REGISTER_TTL_SECONDS, json.dumps(payload),
+            redis_key,
+            settings.PENDING_REGISTER_TTL_SECONDS,
+            json.dumps(payload),
         )
 
         await self.email_service.send_verification_email(
-            to_email=user_data.email, full_name=user_data.full_name, token=raw_token,
+            to_email=user_data.email,
+            full_name=user_data.full_name,
+            token=raw_token,
         )
 
         logger.info(f"Pending registration saved to Redis for email: {user_data.email}")
@@ -125,7 +133,9 @@ class AuthService:
 
         db_role = self.db.query(Role).filter(Role.name == payload["role_name"]).first()
         if not db_role:
-            raise InternalServerError("System configuration error: Role does not exist.")
+            raise InternalServerError(
+                "System configuration error: Role does not exist."
+            )
 
         new_user = User(
             email=email,
@@ -143,9 +153,7 @@ class AuthService:
         return {"detail": "Email verified successfully. You can now log in."}
 
     async def forgot_password(self, data: ForgotPasswordRequest) -> dict:
-        uniform_message = (
-            "A password reset link has been sent to your email."
-        )
+        uniform_message = "A password reset link has been sent to your email."
 
         user = self.db.query(User).filter(User.email == data.email).first()
         if not user:
@@ -194,7 +202,9 @@ class AuthService:
         await self.token_service.revoke_all_user_tokens(user_id, revoke_db_tokens=True)
 
         logger.info(f"Password reset successfully for user_id={user_id}")
-        return {"detail": "Password reset successfully. Please log in with your new password."}
+        return {
+            "detail": "Password reset successfully. Please log in with your new password."
+        }
 
     async def login(self, form_data: UserLogin, request: Request) -> dict:
         target_user = self.db.query(User).filter(User.email == form_data.email).first()
@@ -234,11 +244,15 @@ class AuthService:
 
     async def refresh(self, refresh_token: str, request: Request) -> dict:
         if not refresh_token:
-            raise UnauthorizedError("Session has expired or is invalid (Missing Cookie).")
+            raise UnauthorizedError(
+                "Session has expired or is invalid (Missing Cookie)."
+            )
 
         if await is_refresh_token_blacklisted(self.redis, refresh_token):
             try:
-                payload = decode_token(refresh_token, expected_type="refresh", raise_on_error=False)
+                payload = decode_token(
+                    refresh_token, expected_type="refresh", raise_on_error=False
+                )
                 if payload and payload.get("id"):
                     await self.token_service.revoke_all_user_tokens(payload.get("id"))
             except Exception as e:
@@ -249,7 +263,11 @@ class AuthService:
         payload = decode_token(refresh_token, expected_type="refresh")
         remember_me = payload.get("remember_me", False)
 
-        db_token = self.db.query(RefreshToken).filter(RefreshToken.jti == payload["jti"]).first()
+        db_token = (
+            self.db.query(RefreshToken)
+            .filter(RefreshToken.jti == payload["jti"])
+            .first()
+        )
 
         if not db_token:
             raise UnauthorizedError("Refresh token does not exist.")
@@ -293,9 +311,13 @@ class AuthService:
 
     async def logout(self, refresh_token: str) -> dict:
         if refresh_token:
-            payload = decode_token(refresh_token, expected_type="refresh", raise_on_error=False)
+            payload = decode_token(
+                refresh_token, expected_type="refresh", raise_on_error=False
+            )
             if payload:
-                await blacklist_refresh_token(self.redis, refresh_token, payload.get("exp"))
+                await blacklist_refresh_token(
+                    self.redis, refresh_token, payload.get("exp")
+                )
                 user_id = payload.get("id")
                 await self.presence.clear_online_status(user_id)
                 self.token_service.revoke_refresh_token(payload.get("jti"))

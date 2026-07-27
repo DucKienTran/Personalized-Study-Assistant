@@ -19,7 +19,9 @@ def validate_strong_password_logic(value: str) -> str:
     if not re.search(r"[a-z]", value) or not re.search(r"[0-9]", value):
         raise ValueError("Password must contain both lowercase letters and digits.")
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
-        raise ValueError("Password must contain at least one special character (!@#$%^&*...).")
+        raise ValueError(
+            "Password must contain at least one special character (!@#$%^&*...)."
+        )
     return value
 
 
@@ -33,7 +35,9 @@ class UserRegister(BaseModel):
         ..., min_length=8, description="Password must be at least 8 characters long."
     )
     confirm_password: str = Field(
-        ..., min_length=8, description="Confirmation password must be at least 8 characters long."
+        ...,
+        min_length=8,
+        description="Confirmation password must be at least 8 characters long.",
     )
     full_name: Optional[str] = None
 
@@ -60,10 +64,14 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(
-        ..., min_length=8, description="New password must be at least 8 characters long."
+        ...,
+        min_length=8,
+        description="New password must be at least 8 characters long.",
     )
     confirm_new_password: str = Field(
-        ..., min_length=8, description="Confirmation password must be at least 8 characters long."
+        ...,
+        min_length=8,
+        description="Confirmation password must be at least 8 characters long.",
     )
 
     @model_validator(mode="after")
@@ -81,10 +89,14 @@ class ResetPasswordRequest(BaseModel):
 class ChangePassword(BaseModel):
     old_password: str
     new_password: str = Field(
-        ..., min_length=8, description="New password must be at least 8 characters long."
+        ...,
+        min_length=8,
+        description="New password must be at least 8 characters long.",
     )
     confirm_new_password: str = Field(
-        ..., min_length=8, description="Confirmation password must be at least 8 characters long."
+        ...,
+        min_length=8,
+        description="Confirmation password must be at least 8 characters long.",
     )
 
     @model_validator(mode="after")

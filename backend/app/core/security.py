@@ -38,12 +38,17 @@ ALGORITHM = settings.JWT_ALGORITHM
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
     to_encode.update({"exp": expire, "token_type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
 def hash_token(token: str) -> str:
     """Compute SHA-256 hash of a string token."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
 
 def create_refresh_token(data: dict, expire_minutes: int) -> str:
     to_encode = data.copy()
@@ -60,7 +65,12 @@ def generate_tokens_pair(
     remember_me: bool = False,
 ) -> dict:
     access_token = create_access_token(
-        data={"id": user_id, "sub": email, "role": role_name, "permissions": permissions}
+        data={
+            "id": user_id,
+            "sub": email,
+            "role": role_name,
+            "permissions": permissions,
+        }
     )
 
     expire_minutes = (
@@ -138,7 +148,9 @@ async def is_refresh_token_blacklisted(redis: Redis, token: str) -> bool:
     return bool(await redis.get(f"blacklist:refresh:{token}"))
 
 
-def set_refresh_cookie(response: Response, token: str, remember_me: bool = False) -> None:
+def set_refresh_cookie(
+    response: Response, token: str, remember_me: bool = False
+) -> None:
     max_age = (settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60) if remember_me else None
     response.set_cookie(
         key="refresh_token",

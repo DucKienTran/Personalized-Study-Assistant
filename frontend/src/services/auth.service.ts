@@ -20,13 +20,23 @@ export class AuthService {
     return response.data;
   }
 
-  async forgotPassword(data: ForgotPasswordRequest): Promise<MessageResponse> {
-    const response = await api.post<MessageResponse>("/auth/forgot-password", data);
+  async forgotPassword(
+    data: ForgotPasswordRequest
+  ): Promise<MessageResponse> {
+    const response = await api.post<MessageResponse>(
+      "/auth/forgot-password",
+      data
+    );
     return response.data;
   }
 
-  async resetPassword(data: ResetPasswordRequest): Promise<MessageResponse> {
-    const response = await api.post<MessageResponse>("/auth/reset-password", data);
+  async resetPassword(
+    data: ResetPasswordRequest
+  ): Promise<MessageResponse> {
+    const response = await api.post<MessageResponse>(
+      "/auth/reset-password",
+      data
+    );
     return response.data;
   }
 

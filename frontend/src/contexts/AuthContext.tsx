@@ -4,10 +4,10 @@ import React, { createContext, useCallback, useEffect, useState } from "react";
 import { authService } from "@/services/auth.service";
 import { userService } from "@/services/user.service";
 import { tokenStorage } from "@/services/api";
-import { CurrentUser, UserLogin } from "@/types";
+import { UserResponse, UserLogin } from "@/types";
 
 export interface AuthContextType {
-  currentUser: CurrentUser | null;
+  currentUser: UserResponse | null;
   authenticated: boolean;
   loading: boolean;
   login: (credentials: UserLogin) => Promise<void>;
@@ -22,10 +22,10 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchCurrentUser = useCallback(async (): Promise<CurrentUser> => {
+  const fetchCurrentUser = useCallback(async (): Promise<UserResponse> => {
     const user = await userService.getCurrentUser();
     setCurrentUser(user);
     return user;

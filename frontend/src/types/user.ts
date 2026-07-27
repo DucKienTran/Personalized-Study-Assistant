@@ -8,13 +8,6 @@ export interface UserResponse {
   updated_at: string | null;
 }
 
-export interface CurrentUser {
-  id: number;
-  email: string;
-  role: string;
-  permissions: string[];
-}
-
 export interface UserStatus {
   user_id: number;
   email: string;

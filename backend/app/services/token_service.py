@@ -76,11 +76,7 @@ class TokenService:
         self,
         jti: str,
     ) -> None:
-        db_token = (
-            self.db.query(RefreshToken)
-            .filter(RefreshToken.jti == jti)
-            .first()
-        )
+        db_token = self.db.query(RefreshToken).filter(RefreshToken.jti == jti).first()
 
         if db_token:
             db_token.revoked = True
