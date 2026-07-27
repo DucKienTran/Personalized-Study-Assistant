@@ -134,6 +134,22 @@ export const CloseIcon = (props: IconWrapperProps) => (
   <Icon name="close" {...props} />
 );
 
+export const AddIcon = (props: IconWrapperProps) => (
+  <Icon name="add" {...props} />
+);
+
+export const EditIcon = (props: IconWrapperProps) => (
+  <Icon name="edit" {...props} />
+);
+
+export const DeleteIcon = (props: IconWrapperProps) => (
+  <Icon name="delete" {...props} />
+);
+
+export const ChatBubbleIcon = (props: IconWrapperProps) => (
+  <Icon name="chat" {...props} />
+);
+
 /* ============================================================
  * Quiz & Interactive Icons (Mapped to Material Symbols)
  * ========================================================== */

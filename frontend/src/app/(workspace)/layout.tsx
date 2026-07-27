@@ -4,9 +4,8 @@ import Link from "next/link";
 import UploadModal from "@/components/shared/UploadModal";
 import { DocumentListItem } from "@/services/document.service";
 import { useRouter, usePathname } from "next/navigation";
-import { userService, UserProfile } from "@/services/user.service";
+import { useAuth } from "@/hooks/useAuth";
 import { UserIcon, KeyIcon, LogoutIcon } from "@/components/shared/icons";
-import { authService } from "@/services/auth.service";
 
 const HomeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -36,22 +35,21 @@ const HistoryIcon = () => (
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [user, setUser] = useState<UserProfile | null>(null);
+    const { currentUser, authenticated, loading, logout } = useAuth();
     const [isHovered, setIsHovered] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false); // State quản lý ẩn hiện Dropdown Profile
-    const [loading, setLoading] = useState(true);
 
-    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const profileRef = useRef<HTMLDivElement>(null); // Dùng để bắt sự kiện click out đóng menu
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
 
     useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (!token) { router.push("/login"); return; }
-        userService.getMe().then((data) => { setUser(data); setLoading(false); }).catch(() => { localStorage.removeItem("access_token"); router.push("/login"); });
-    }, [router]);
+        if (!loading && !authenticated) {
+            router.replace("/login");
+        }
+    }, [authenticated, loading, router]);
 
     // Logic click out để tự đóng mở profile khi click ra ngoài vùng menu
     useEffect(() => {
@@ -69,22 +67,31 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         window.addEventListener("open-upload-modal", handleOpenModal);
         return () => window.removeEventListener("open-upload-modal", handleOpenModal);
     }, []);
+    
+    if (loading || !authenticated) {
+        return null;
+    }
 
     const handleMouseEnter = () => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 300); };
     const handleMouseLeave = () => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setIsHovered(false); };
-    const handleLogout = async () => { await authService.logout(); router.push("/login"); };
+    const handleLogout = async () => {
+        await logout();
+        router.replace("/login");
+    };    
     const handleUploaded = (doc: DocumentListItem) => {
-    setIsUploadModalOpen(false);
-    router.push(`/documents/${doc.id}/summary`); // upload xong → thẳng vào tóm tắt luôn
-};
+        setIsUploadModalOpen(false);
+        router.push(`/documents/${doc.id}/summary`); // upload xong → thẳng vào tóm tắt luôn
+    };
     const menus = [
         { name: "Trang chủ", href: "/", icon: <HomeIcon /> },
         { name: "Thư viện của tôi", href: "/documents", icon: <LibraryIcon /> },
         { name: "Thống kê", href: "/dashboard", icon: <DashboardIcon /> },
     ];
 
-    const avatarLetter = user?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U";
-
+    const avatarLetter =
+        (currentUser?.full_name ?? currentUser?.email)
+            ?.charAt(0)
+            .toUpperCase() ?? "U";
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden text-sm">
             {/* Thanh Sidebar bên trái */}
@@ -102,7 +109,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
                     <button
                         onClick={() => window.dispatchEvent(new Event("open-upload-modal"))}
-                        className={`bg-[#e6f4ea] hover:bg-[#cbdcd0] text-[#2e5f3f] flex items-center justify-center transition-all duration-300 shadow-sm overflow-hidden ${isHovered ? "w-full h-11 px-4 py-3 rounded-xl justify-start space-x-3" : "w-11 h-11 rounded-xl mx-auto"}`}
+                        className={`bg-[#e6f4ea] hover:bg-[#cbdcd0] text-[#2e5f3f] flex items-center justify-center transition-all duration-300 shadow-xs overflow-hidden ${isHovered ? "w-full h-11 px-4 py-3 rounded-xl justify-start space-x-3" : "w-11 h-11 rounded-xl mx-auto"}`}
                     >
                         <span className="font-bold text-3xl ">＋</span>
                         {isHovered && <span className="font-semibold text-sm whitespace-nowrap uppercase tracking-wider">Upload</span>}
@@ -149,7 +156,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                 </div>
 
                 <div className={`group relative flex items-center justify-between px-2 transition-opacity duration-200 cursor-pointer hover:bg-gray-50 rounded-lg py-2 ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={handleLogout}>
-                    <div className="text-xs text-gray-400 truncate max-w-[140px]">{user?.email}</div>
+                    <div className="text-xs text-gray-400 truncate max-w-[140px]">{currentUser?.email}</div>
                     <span className="text-[11px] text-red-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Rời đi</span>
                 </div>
             </aside>
@@ -160,8 +167,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                 <div ref={profileRef} className="absolute top-6 right-8 z-30">
                     <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}
-                        className="w-10 h-10 rounded-full bg-[#e6f4ea] text-[#2e5f3f] flex items-center justify-center font-bold text-base shadow-sm border-4 border-white cursor-pointer hover:bg-[#cbdcd0] transition-all duration-200 focus:outline-none"
-                        title={`Tài khoản: ${user?.email}`}
+                        className="w-10 h-10 rounded-full bg-[#e6f4ea] text-[#2e5f3f] flex items-center justify-center font-bold text-base shadow-xs border-4 border-white cursor-pointer hover:bg-[#cbdcd0] transition-all duration-200 focus:outline-hidden"
+                        title={`Tài khoản: ${currentUser?.email}`}
                     >
                         {avatarLetter}
                     </button>
@@ -170,8 +177,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                     {isProfileOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-50 text-xs animate-fadeIn">
                             <div className="px-4 py-2 border-b border-gray-50">
-                                <p className="font-semibold text-gray-800 truncate">{user?.full_name || "Người dùng"}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
+                                <p className="font-semibold text-gray-800 truncate">{currentUser?.full_name || "Người dùng"}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{currentUser?.email}</p>
                             </div>
                             <Link
                                 href="/profile"
