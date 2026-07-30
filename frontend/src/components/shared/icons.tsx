@@ -62,6 +62,10 @@ export const ArrowForwardIcon = (props: IconWrapperProps) => (
   <Icon name="arrow_forward" {...props} />
 );
 
+export const ArrowBackIcon = (props: IconWrapperProps) => (
+  <Icon name="arrow_back" {...props} />
+);
+
 export const WarningIcon = (props: IconWrapperProps) => (
   <Icon name="warning" {...props} />
 );
@@ -148,6 +152,10 @@ export const DeleteIcon = (props: IconWrapperProps) => (
 
 export const ChatBubbleIcon = (props: IconWrapperProps) => (
   <Icon name="chat" {...props} />
+);
+
+export const BotMessageIcon = (props: IconWrapperProps) => (
+  <Icon name="smart_toy" {...props} />
 );
 
 /* ============================================================

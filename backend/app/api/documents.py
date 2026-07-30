@@ -10,7 +10,6 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel
 
 from app.core.dependencies import (
     CurrentUserDep,
@@ -20,7 +19,12 @@ from app.core.dependencies import (
     SummaryServiceDep,
     get_current_user,
 )
-from app.schemas.document_schema import DocumentContentOut, DocumentOut
+from app.schemas.document_schema import (
+    DocumentContentOut,
+    DocumentOut,
+    FileUrlOut,
+    SummarizeRequest,
+)
 from app.schemas.response_schema import BaseResponse
 from app.schemas.summary_schema import (
     OverwriteSummaryRequest,
@@ -33,13 +37,6 @@ router = APIRouter(
     tags=["Documents"],
     dependencies=[Depends(get_current_user)],
 )
-
-
-class SummarizeRequest(BaseModel):
-    document_id: int
-    level: str = "normal"
-    format: str = "markdown"
-    instruction: Optional[str] = ""
 
 
 @router.post(
@@ -238,3 +235,24 @@ async def delete_document(
     if not success:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
     return BaseResponse(message="Đã xóa tài liệu")
+
+
+@router.get(
+    "/{document_id}/file-url",
+    status_code=status.HTTP_200_OK,
+    response_model=BaseResponse[FileUrlOut],
+)
+async def get_document_file_url(
+    document_id: int,
+    doc_service: DocumentServiceDep,
+    current_user: CurrentUserDep,
+):
+    url = await doc_service.get_document_file_url(
+        document_id=document_id,
+        user_id=current_user.id,
+    )
+
+    if url is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
+
+    return BaseResponse(data=FileUrlOut(url=url))

@@ -20,3 +20,14 @@ class DocumentContentOut(BaseModel):
     file_type: str
     total_pages: int
     content_raw: str
+
+
+class FileUrlOut(BaseModel):
+    url: str
+
+
+class SummarizeRequest(BaseModel):
+    document_id: int
+    level: str = "normal"
+    format: str = "markdown"
+    instruction: Optional[str] = ""

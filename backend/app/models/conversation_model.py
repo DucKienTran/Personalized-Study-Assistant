@@ -18,6 +18,7 @@ class Conversation(Base):
         back_populates="conversation", cascade="all, delete-orphan"
     )
 
+
 class Message(Base):
     __tablename__ = "messages"
 
@@ -28,5 +29,5 @@ class Message(Base):
     sender: Mapped[str] = mapped_column(String(10))  # "user" | "ai"
     content: Mapped[str] = mapped_column(Text)
     sources_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc))   
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc))
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")

@@ -96,6 +96,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       {/* Message */}
       <div className={isUser ? "max-w-[80%]" : "flex-1 min-w-0"}>
         <div
+          data-chat-bubble
           className={`rounded-2xl border shadow-xs transition-colors ${
             isUser
               ? "border-[#B9DFC7] bg-[#CFEBD8] text-[#173D2A]"

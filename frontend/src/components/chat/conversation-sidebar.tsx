@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConversationSummary } from "@/types/chat";
 import { cn } from "@/lib/utils";
+import { groupConversationsByDate } from "@/utils/conversation-grouping";
 
 interface ConversationSidebarProps {
   conversations: ConversationSummary[];
@@ -48,6 +49,69 @@ export function ConversationSidebar({
     }
     setEditingId(null);
   };
+
+  const renderConversationRow = (conv: ConversationSummary) => {
+    const isActive = conv.id === activeConversationId;
+    const isEditing = editingId === conv.id;
+
+    return (
+      <div
+        key={conv.id}
+        className={cn(
+          "group flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors",
+          isActive
+            ? "border-l-2 border-primary bg-primary/5 font-medium text-foreground"
+            : "border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        <ChatBubbleIcon size={16} className="shrink-0" />
+
+        {isEditing ? (
+          <>
+            <input
+              autoFocus
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") setEditingId(null);
+              }}
+              className="flex-1 rounded border border-border bg-white px-1.5 py-0.5 text-sm outline-none focus:border-primary"
+            />
+            <button onClick={commitEdit} className="shrink-0 text-primary">
+              <CheckIcon size={14} />
+            </button>
+            <button onClick={() => setEditingId(null)} className="shrink-0 text-muted-foreground">
+              <CloseIcon size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => onSelect(conv.id)} className="flex-1 truncate text-left">
+              {conv.title}
+            </button>
+            <button
+              onClick={() => startEdit(conv)}
+              className="hidden shrink-0 text-muted-foreground hover:text-foreground group-hover:block"
+            >
+              <PenIcon size={14} />
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Delete this conversation?")) onDelete(conv.id);
+              }}
+              className="hidden shrink-0 text-muted-foreground hover:text-destructive group-hover:block"
+            >
+              <TrashIcon size={14} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const groups = groupConversationsByDate(conversations);
+
   return (
     <aside className="hidden md:flex md:w-72 md:flex-col md:border-r md:border-border md:bg-white">
       <div className="p-3">
@@ -69,66 +133,17 @@ export function ConversationSidebar({
             No conversations yet.
           </p>
         ) : (
-          <div className="space-y-1 px-2">
-            {conversations.map((conv) => {
-              const isActive = conv.id === activeConversationId;
-              const isEditing = editingId === conv.id;
-
-              return (
-                <div
-                  key={conv.id}
-                  className={cn(
-                    "group flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors",
-                    isActive
-                      ? "border-l-2 border-primary bg-primary/5 font-medium text-foreground"
-                      : "border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <ChatBubbleIcon size={16} className="shrink-0" />
-
-                  {isEditing ? (
-                    <>
-                      <input
-                        autoFocus
-                        value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") commitEdit();
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        className="flex-1 rounded border border-border bg-white px-1.5 py-0.5 text-sm outline-none focus:border-primary"
-                      />
-                      <button onClick={commitEdit} className="shrink-0 text-primary">
-                        <CheckIcon size={14} />
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="shrink-0 text-muted-foreground">
-                        <CloseIcon   size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => onSelect(conv.id)} className="flex-1 truncate text-left">
-                        {conv.title}
-                      </button>
-                      <button
-                        onClick={() => startEdit(conv)}
-                        className="hidden shrink-0 text-muted-foreground hover:text-foreground group-hover:block"
-                      >
-                        <PenIcon size={14} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm("Delete this conversation?")) onDelete(conv.id);
-                        }}
-                        className="hidden shrink-0 text-muted-foreground hover:text-destructive group-hover:block"
-                      >
-                        <TrashIcon size={14} />
-                      </button>
-                    </>
-                  )}
+          <div className="space-y-4 px-2 pb-2">
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </p>
+                <div className="space-y-1">
+                  {group.conversations.map(renderConversationRow)}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </ScrollArea>

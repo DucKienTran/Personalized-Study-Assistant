@@ -9,7 +9,8 @@ class RAGQueryRequest(BaseModel):
     chat_history: Optional[List[Dict[str, str]]] = Field(
         None, description="Lịch sử hội thoại"
     )
-    conversation_id: Optional[int] = None   
+    conversation_id: Optional[int] = None
+
 
 class CitationSourceSchema(BaseModel):
     index: int
@@ -34,5 +35,3 @@ class RAGQueryResponse(BaseModel):
     answer: str
     sources: list[CitationSourceSchema]
     metadata: Optional[RAGMetadataSchema] = None
-
-

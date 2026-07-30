@@ -14,7 +14,9 @@ from app.core.dependencies import (
 from app.schemas.rag_schema import RAGQueryRequest, RAGQueryResponse
 from app.services.conversation_service import ConversationService
 
-router = APIRouter(prefix="/rag", tags=["Rag"], dependencies=[Depends(get_current_user)])
+router = APIRouter(
+    prefix="/rag", tags=["Rag"], dependencies=[Depends(get_current_user)]
+)
 
 conversation_service = ConversationService()
 
@@ -62,7 +64,9 @@ async def stream_query_rag(
     target_doc_ids = _resolve_document_ids(payload.document_ids, user_doc_ids)
 
     if payload.conversation_id:
-        conv = conversation_service.get_conversation(db, current_user.id, payload.conversation_id)
+        conv = conversation_service.get_conversation(
+            db, current_user.id, payload.conversation_id
+        )
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
         conversation_id = conv.id
@@ -72,7 +76,10 @@ async def stream_query_rag(
         )
         conversation_id = conv.id
 
-    conversation_service.add_message(db, conversation_id, sender="user", content=payload.query)
+    conversation_service.add_message(
+        db, conversation_id, sender="user", content=payload.query
+    )
+
     async def event_generator():
         full_answer_parts: list[str] = []
         final_sources: list = []
@@ -99,7 +106,8 @@ async def stream_query_rag(
                 payload_data = chunk.get("content")
 
             yield (
-                f"event: {event_type}\n" f"data: {json.dumps(payload_data, ensure_ascii=False)}\n\n"
+                f"event: {event_type}\n"
+                f"data: {json.dumps(payload_data, ensure_ascii=False)}\n\n"
             )
 
         conversation_service.add_message(
