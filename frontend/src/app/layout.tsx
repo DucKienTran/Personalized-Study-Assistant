@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "../contexts/AuthContext";
+import "@/polyfills/promise";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
