@@ -6,7 +6,9 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def create_conversation(self, db: Session, user_id: int, title: str) -> Conversation:
+    def create_conversation(
+        self, db: Session, user_id: int, title: str
+    ) -> Conversation:
         conv = Conversation(user_id=user_id, title=title[:255])
         db.add(conv)
         db.commit()
@@ -73,7 +75,9 @@ class ConversationService:
         db.refresh(conv)
         return conv
 
-    def delete_conversation(self, db: Session, user_id: int, conversation_id: int) -> bool:
+    def delete_conversation(
+        self, db: Session, user_id: int, conversation_id: int
+    ) -> bool:
         conv = self.get_conversation(db, user_id, conversation_id)
         if not conv:
             return False
