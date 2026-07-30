@@ -29,6 +29,9 @@ class User(Base):
 
     role = relationship("Role", back_populates="users")
     documents = relationship("Document", back_populates="user")
+    notebooks = relationship(
+        "Notebook", back_populates="user", cascade="all, delete-orphan"
+    )
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
