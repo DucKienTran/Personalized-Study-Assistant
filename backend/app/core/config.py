@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     VOYAGE_MODEL: str = "voyage-4-lite"
     VOYAGE_EMBEDDING_BATCH_SIZE: int
 
+    AZURE_OPENAI_BASE_URL: str
+    AZURE_OPENAI_CHAT_MODEL: str
+    AZURE_OPENAI_API_KEY: str = ""
+    AZURE_OPENAI_ENDPOINT: str = ""
+    AZURE_OPENAI_API_VERSION: str = "2025-04-01-preview"
+    AZURE_OPENAI_DEPLOYMENT: str = ""
+
     # Database MySQL Config
     DB_HOST: str
     DB_PORT: int = 3306
@@ -43,18 +50,16 @@ class Settings(BaseSettings):
     def MONGODB_URL(self) -> str:
         return f"mongodb://{self.MONGODB_HOST}:{self.MONGODB_PORT}"
 
+    # =========================
     # MinIO Config
-    MINIO_HOST: str = "localhost"
-    MINIO_PORT: int = 9000
+    # =========================
 
-    @property
-    def MINIO_ENDPOINT(self) -> str:
-        return f"{self.MINIO_HOST}:{self.MINIO_PORT}"
-
+    # Internal Docker communication
+    MINIO_ENDPOINT: str
+    MINIO_SECURE: bool
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
-    MINIO_BUCKET: str = "documents"
-    MINIO_SECURE: bool = False
+    MINIO_BUCKET: str
 
     # ChromaDB Config (embedded mode — chạy trong chính container backend)
     CHROMA_PERSIST_DIR: str

@@ -15,6 +15,8 @@ from app.ai.embeddings.base import BaseEmbeddingClient
 from app.ai.embeddings.voyage_client import VoyageEmbeddingClient
 from app.ai.llm.base import LLMClient
 from app.ai.llm.gemini_client import GeminiClient
+from app.ai.llm.azure_openai_client import AzureOpenAIClient
+
 
 # --- INFRASTRUCTURE ---
 from app.core.database import SessionLocal, chroma_client, mongo_client, redis_client
@@ -118,7 +120,8 @@ StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 
 @lru_cache
 def get_llm_client() -> LLMClient:
-    return GeminiClient()
+    return AzureOpenAIClient()
+    # return GeminiClient()
 
 
 LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]
@@ -202,7 +205,9 @@ def get_auth_service(
     presence: PresenceServiceDep,
     email_service: EmailServiceDep,
 ) -> AuthService:
-    return AuthService(db=db, redis=redis, presence=presence, email_service=email_service)
+    return AuthService(
+        db=db, redis=redis, presence=presence, email_service=email_service
+    )
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
@@ -223,7 +228,9 @@ async def get_document_parser_service() -> DocumentParserService:
     return DocumentParserService()
 
 
-DocumentParserServiceDep = Annotated[DocumentParserService, Depends(get_document_parser_service)]
+DocumentParserServiceDep = Annotated[
+    DocumentParserService, Depends(get_document_parser_service)
+]
 
 
 def get_embedding_service(
@@ -308,7 +315,9 @@ def get_summary_record_service(
     return SummaryRecordService(sql_db=db, mongo_db=mongo_db)
 
 
-SummaryRecordServiceDep = Annotated[SummaryRecordService, Depends(get_summary_record_service)]
+SummaryRecordServiceDep = Annotated[
+    SummaryRecordService, Depends(get_summary_record_service)
+]
 
 
 def get_quiz_service(
@@ -354,4 +363,6 @@ def get_conversation_service() -> ConversationService:
     return ConversationService()
 
 
-ConversationServiceDep = Annotated[ConversationService, Depends(get_conversation_service)]
+ConversationServiceDep = Annotated[
+    ConversationService, Depends(get_conversation_service)
+]
