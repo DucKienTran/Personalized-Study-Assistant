@@ -1,4 +1,6 @@
 import api from "./api"; 
+import { apiFetch } from "./api-fetch";
+
 
 export interface DocumentListItem {
     id: number;
@@ -47,5 +49,12 @@ export const documentService = {
     async deleteDocument(id: number): Promise<void> {
         await api.delete(`/documents/${id}`);
     },
+
+    async getDocumentFileUrl(documentId: number): Promise<string> {
+        const res = await apiFetch(`/documents/${documentId}/file-url`, { method: "GET" });
+        if (!res.ok) throw new Error("Failed to get document URL");
+        const body = await res.json();
+        return body.data.url;
+      }
 };
 

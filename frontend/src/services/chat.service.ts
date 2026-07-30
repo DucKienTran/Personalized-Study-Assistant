@@ -95,10 +95,39 @@ class ChatService {
   }
 
   async deleteConversation(id: number): Promise<void> {
-    const res = await apiFetch(`/conversations/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete conversation");
+    const res = await apiFetch(`/conversations/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to delete conversation");
+    }
   }
 
+  async getDocumentFileUrl(documentId: number): Promise<string> {
+    const res = await apiFetch(`/documents/${documentId}/file-url`, {
+      method: "GET",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to get document file URL (${res.status})`);
+    }
+
+    const response = await res.json();
+
+    const url = response?.data?.url;
+
+    if (!url) {
+      console.error(
+        "[ChatService] Invalid file-url response:",
+        response
+      );
+
+      throw new Error("Document file URL is missing from API response");
+    }
+
+    return url;
+  }
   async streamQuestion(
       payload: RAGQueryRequest,
       callbacks: StreamCallbacks
@@ -272,3 +301,5 @@ class ChatService {
   }
 
   export const chatService = new ChatService();
+
+  
