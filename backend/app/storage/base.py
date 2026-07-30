@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import timedelta
 
 
 class StorageService(ABC):
@@ -49,4 +50,20 @@ class StorageService(ABC):
         self,
         object_name: str,
     ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_presigned_url(
+        self,
+        object_name: str,
+        expires: timedelta = timedelta(minutes=15),
+    ) -> str:
+        """
+        Generate a short-lived, publicly-accessible URL for an object.
+
+        Returns
+        -------
+        str
+            Presigned URL.
+        """
         raise NotImplementedError

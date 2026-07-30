@@ -58,6 +58,10 @@ class Document(Base):
         "DocumentSummary", back_populates="document", cascade="all, delete-orphan"
     )
 
+    notebook_documents = relationship(
+        "NotebookDocument", back_populates="document", cascade="all, delete-orphan"
+    )
+
 
 class DocumentSummary(Base):
     __tablename__ = "document_summaries"

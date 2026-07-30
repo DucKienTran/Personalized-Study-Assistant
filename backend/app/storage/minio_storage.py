@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from datetime import timedelta
 import os
 from pathlib import Path
 import tempfile
-from app.core.config import settings
+from urllib.parse import urlparse, urlunparse
+
 from minio import Minio
 
+from app.core.config import settings
 from app.storage.base import StorageService
 
 
@@ -25,8 +28,9 @@ class MinIOStorageService(StorageService):
 
         self.bucket_name = bucket_name
 
+        # Chỉ dùng internal endpoint để backend giao tiếp với MinIO
         self.client = Minio(
-            endpoint=settings.MINIO_ENDPOINT,
+            endpoint=endpoint,
             access_key=access_key,
             secret_key=secret_key,
             secure=secure,
@@ -44,7 +48,6 @@ class MinIOStorageService(StorageService):
         file_bytes: bytes,
         content_type: str,
     ) -> str:
-
         from io import BytesIO
 
         self.client.put_object(
@@ -61,14 +64,12 @@ class MinIOStorageService(StorageService):
         self,
         object_name: str,
     ) -> str:
-
         suffix = Path(object_name).suffix
 
         temp = tempfile.NamedTemporaryFile(
             suffix=suffix,
             delete=False,
         )
-
         temp.close()
 
         self.client.fget_object(
@@ -83,7 +84,6 @@ class MinIOStorageService(StorageService):
         self,
         temp_path: str,
     ) -> None:
-
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -91,11 +91,25 @@ class MinIOStorageService(StorageService):
         self,
         object_name: str,
     ) -> None:
-
         self.client.remove_object(
-            self.bucket_name,
-            object_name,
+            bucket_name=self.bucket_name,
+            object_name=object_name,
         )
+
+    async def get_presigned_url(
+        self,
+        object_name: str,
+        expires: timedelta = timedelta(minutes=15),
+    ) -> str:
+        url = self.client.presigned_get_object(
+            bucket_name=self.bucket_name,
+            object_name=object_name,
+            expires=expires,
+        )
+
+        parsed = urlparse(url)
+
+        return urlunparse(parsed._replace(netloc="storage.learningaid.local:9000"))
 
 
 class MinIOStorageManager:
@@ -112,9 +126,7 @@ class MinIOStorageManager:
         )
 
     def close_service(self):
-        # MinIO client dùng HTTP request-per-call, không giữ connection
-        # persistent cần đóng tường minh — giữ hàm này chỉ để khớp lifecycle
-        # interface với Mongo/Chroma, không phải thiếu code.
+        # MinIO Python client không cần đóng kết nối thủ công.
         pass
 
 

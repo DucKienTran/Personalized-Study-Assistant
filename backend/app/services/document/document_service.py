@@ -174,31 +174,51 @@ class DocumentService:
 
         return [row.id for row in rows]
 
+    async def delete_document(self, document_id: int, user_id: int) -> bool:
+        doc = (
+            self.sql_db.query(Document)
+            .filter(Document.id == document_id, Document.user_id == user_id)
+            .first()
+        )
+        if not doc:
+            return False
 
-async def delete_document(self, document_id: int, user_id: int) -> bool:
-    doc = (
-        self.sql_db.query(Document)
-        .filter(Document.id == document_id, Document.user_id == user_id)
-        .first()
-    )
-    if not doc:
-        return False
+        chroma_collection = self.chroma_client.get_or_create_collection(
+            name=settings.CHROMA_COLLECTION_NAME
+        )
+        chroma_collection.delete(where={"document_id": document_id})
 
-    chroma_collection = self.chroma_client.get_or_create_collection(
-        name=settings.CHROMA_COLLECTION_NAME
-    )
-    chroma_collection.delete(where={"document_id": document_id})
+        if doc.mongo_id:
+            try:
+                target_id = ObjectId(doc.mongo_id)
+            except Exception:
+                target_id = doc.mongo_id
+            await self.mongo_collection.delete_one({"_id": target_id})
 
-    if doc.mongo_id:
-        try:
-            target_id = ObjectId(doc.mongo_id)
-        except Exception:
-            target_id = doc.mongo_id
-        await self.mongo_collection.delete_one({"_id": target_id})
+        self.sql_db.delete(doc)
+        self.sql_db.commit()
 
-    self.sql_db.delete(doc)
-    self.sql_db.commit()
+        await self.redis.incr(f"rag:bm25:version:{user_id}")
 
-    await self.redis.incr(f"rag:bm25:version:{user_id}")
+        return True
 
-    return True
+    async def get_document_file_url(
+        self,
+        document_id: int,
+        user_id: int,
+    ) -> Optional[str]:
+        document = (
+            self.sql_db.query(Document)
+            .filter(
+                Document.id == document_id,
+                Document.user_id == user_id,
+            )
+            .first()
+        )
+
+        if document is None:
+            return None
+
+        return await self.storage_service.get_presigned_url(
+            object_name=document.file_path,
+        )
