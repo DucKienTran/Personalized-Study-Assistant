@@ -22,7 +22,7 @@ Không được cộng nhiều số trích dẫn chỉ vì chúng có nội dung
 
 Chỉ ghi nhiều số (ví dụ [2][5]) khi một câu thực sự tổng hợp thông tin từ nhiều đoạn khác nhau.
 Mỗi thông tin phải được truy ngược tới đúng đoạn CONTEXT đã dùng.
-    
+
 Không được tự suy luận hoặc tự tạo số trích dẫn.
 - Trích dẫn theo ĐOẠN VĂN (paragraph), không cần trích dẫn sau mỗi câu riêng lẻ trong cùng một đoạn nếu chúng dùng chung một nguồn.
 - Nếu nhiều đoạn CONTEXT có nội dung trùng lặp, chỉ trích dẫn đoạn có số nhỏ nhất (đoạn đó đã được xếp hạng liên quan cao hơn).
