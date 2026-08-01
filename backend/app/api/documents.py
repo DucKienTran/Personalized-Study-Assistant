@@ -23,14 +23,9 @@ from app.schemas.document_schema import (
     DocumentContentOut,
     DocumentOut,
     FileUrlOut,
-    SummarizeRequest,
 )
 from app.schemas.response_schema import BaseResponse
-from app.schemas.summary_schema import (
-    OverwriteSummaryRequest,
-    SaveSummaryRequest,
-    SummaryOut,
-)
+
 
 router = APIRouter(
     prefix="/documents",
@@ -69,103 +64,6 @@ async def upload_and_process_document(
         data=new_doc,
     )
 
-
-@router.post("/summarize", status_code=status.HTTP_200_OK, response_model=BaseResponse)
-async def summarize_document(
-    payload: SummarizeRequest,
-    doc_service: DocumentServiceDep,
-    summary_service: SummaryServiceDep,
-    current_user: CurrentUserDep,
-):
-    doc_record = doc_service.get_document(
-        user_id=current_user.id,
-        document_id=payload.document_id,
-    )
-    if not doc_record or not doc_record.mongo_id:
-        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
-
-    summary_result = await summary_service.generate_summary(
-        mongo_id=doc_record.mongo_id,
-        level=payload.level,
-        format_type=payload.format,
-        instruction=payload.instruction,
-    )
-    return BaseResponse(data={"summary_text": summary_result})
-
-
-@router.post(
-    "/summaries", status_code=status.HTTP_201_CREATED, response_model=BaseResponse
-)
-async def save_summary(
-    payload: SaveSummaryRequest,
-    summary_record_service: SummaryRecordServiceDep,
-    current_user: CurrentUserDep,
-):
-    config = {
-        "level": payload.level,
-        "format": payload.format,
-        "instruction": payload.instruction,
-    }
-    result = await summary_record_service.save_summary(
-        user_id=current_user.id,
-        document_id=payload.document_id,
-        title=payload.title,
-        summary_text=payload.summary_text,
-        config=config,
-    )
-    return BaseResponse(data=result)
-
-
-@router.put(
-    "/summaries/{summary_id}",
-    status_code=status.HTTP_200_OK,
-    response_model=BaseResponse,
-)
-async def update_summary(
-    summary_id: int,
-    payload: OverwriteSummaryRequest,
-    summary_record_service: SummaryRecordServiceDep,
-    current_user: CurrentUserDep,
-):
-    result = await summary_record_service.update_summary(
-        user_id=current_user.id,
-        summary_id=summary_id,
-        summary_text=payload.summary_text,
-        title=payload.title,
-    )
-    return BaseResponse(data=result)
-
-
-@router.get(
-    "/summaries",
-    status_code=status.HTTP_200_OK,
-    response_model=BaseResponse[list[SummaryOut]],
-)
-async def get_summary_history(
-    summary_record_service: SummaryRecordServiceDep,
-    current_user: CurrentUserDep,
-    document_id: Optional[int] = Query(None),
-):
-    history = summary_record_service.get_summary_history_list(
-        user_id=current_user.id, document_id=document_id
-    )
-    return BaseResponse(data=history)
-
-
-@router.get(
-    "/summaries/{summary_id}",
-    status_code=status.HTTP_200_OK,
-    response_model=BaseResponse,
-)
-async def get_summary_detail(
-    summary_id: int,
-    summary_record_service: SummaryRecordServiceDep,
-    current_user: CurrentUserDep,
-):
-    detail = await summary_record_service.get_summary_detail(
-        user_id=current_user.id, summary_id=summary_id
-    )
-    return BaseResponse(data=detail)
 
 
 @router.get(

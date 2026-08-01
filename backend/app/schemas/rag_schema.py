@@ -4,7 +4,14 @@ from pydantic import BaseModel, Field
 
 class RAGQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Câu hỏi của người dùng")
-    document_ids: List[int] = Field(..., description="Danh sách ID tài liệu truy vấn")
+    notebook_id: int = Field(..., description="Notebook đang chat")
+    document_ids: Optional[List[int]] = Field(
+        None,
+        description=(
+            "Override tùy chọn: chỉ dùng chunk từ các document_id này. "
+            "Nếu bỏ trống, service tự lấy toàn bộ document đang is_active=True trong notebook."
+        ),
+    )
     top_k: int = Field(5, ge=1, le=20, description="Số lượng chunk lấy ra")
     chat_history: Optional[List[Dict[str, str]]] = Field(
         None, description="Lịch sử hội thoại"

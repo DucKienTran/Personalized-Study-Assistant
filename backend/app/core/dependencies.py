@@ -13,10 +13,8 @@ from sqlalchemy.orm import Session
 # --- LLM & EMBEDDING CLIENTS ---
 from app.ai.embeddings.base import BaseEmbeddingClient
 from app.ai.embeddings.voyage_client import VoyageEmbeddingClient
-from app.ai.llm.base import LLMClient
-from app.ai.llm.gemini_client import GeminiClient
 from app.ai.llm.azure_openai_client import AzureOpenAIClient
-
+from app.ai.llm.base import LLMClient
 
 # --- INFRASTRUCTURE ---
 from app.core.database import SessionLocal, chroma_client, mongo_client, redis_client
@@ -35,15 +33,16 @@ from app.services.ai.embedding_service import EmbeddingService
 from app.services.ai.quiz_service import QuizService
 from app.services.ai.rag_service import RAGService
 from app.services.ai.retrieval_service import RetrievalService
-from app.services.ai.summary_service import SummaryService
 from app.services.auth_service import AuthService
 from app.services.conversation_service import ConversationService
 from app.services.document.document_processing_service import DocumentProcessingService
 from app.services.document.document_service import DocumentService
 from app.services.document.parser import DocumentParserService
-from app.services.document.summary_record_service import SummaryRecordService
 from app.services.email_service import EmailService
+from app.services.notebook.notebook_service import NotebookService
 from app.services.presence_service import PresenceService
+from app.services.summary.summary_record_service import SummaryRecordService
+from app.services.summary.summary_service import SummaryService
 from app.services.user_service import UserService
 from app.storage.base import StorageService
 from app.storage.minio_storage import minio_manager
@@ -192,6 +191,15 @@ class PermissionChecker:
 # ==========================================
 
 
+def get_notebook_service(
+    db: DbSession,
+) -> NotebookService:
+    return NotebookService(db=db)
+
+
+NotebookServiceDep = Annotated[NotebookService, Depends(get_notebook_service)]
+
+
 def get_presence_service(redis: RedisDep) -> PresenceService:
     return PresenceService(redis)
 
@@ -205,9 +213,7 @@ def get_auth_service(
     presence: PresenceServiceDep,
     email_service: EmailServiceDep,
 ) -> AuthService:
-    return AuthService(
-        db=db, redis=redis, presence=presence, email_service=email_service
-    )
+    return AuthService(db=db, redis=redis, presence=presence, email_service=email_service)
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
@@ -228,9 +234,7 @@ async def get_document_parser_service() -> DocumentParserService:
     return DocumentParserService()
 
 
-DocumentParserServiceDep = Annotated[
-    DocumentParserService, Depends(get_document_parser_service)
-]
+DocumentParserServiceDep = Annotated[DocumentParserService, Depends(get_document_parser_service)]
 
 
 def get_embedding_service(
@@ -249,19 +253,6 @@ def get_ai_classifier(
 
 
 AIClassifierDep = Annotated[AIClassifier, Depends(get_ai_classifier)]
-
-
-def get_summary_service(
-    db: MongoDbDep,
-    llm_client: LLMClientDep,
-) -> SummaryService:
-    return SummaryService(
-        mongo_db=db,
-        llm_client=llm_client,
-    )
-
-
-SummaryServiceDep = Annotated[SummaryService, Depends(get_summary_service)]
 
 
 def get_document_service(
@@ -308,6 +299,26 @@ DocumentProcessingServiceDep = Annotated[
 ]
 
 
+def get_summary_service(
+    db: DbSession,
+    mongo_db: MongoDbDep,
+    chroma_client: ChromaClientDep,
+    llm_client: LLMClientDep,
+) -> SummaryService:
+    return SummaryService(
+        sql_db=db,
+        mongo_db=mongo_db,
+        chroma_client=chroma_client,
+        llm_client=llm_client,
+    )
+
+
+SummaryServiceDep = Annotated[
+    SummaryService,
+    Depends(get_summary_service),
+]
+
+
 def get_summary_record_service(
     db: DbSession,
     mongo_db: MongoDbDep,
@@ -317,7 +328,7 @@ def get_summary_record_service(
 
 SummaryRecordServiceDep = Annotated[
     SummaryRecordService, Depends(get_summary_record_service)
-]
+] 
 
 
 def get_quiz_service(
@@ -363,6 +374,4 @@ def get_conversation_service() -> ConversationService:
     return ConversationService()
 
 
-ConversationServiceDep = Annotated[
-    ConversationService, Depends(get_conversation_service)
-]
+ConversationServiceDep = Annotated[ConversationService, Depends(get_conversation_service)]

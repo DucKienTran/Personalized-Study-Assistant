@@ -21,9 +21,9 @@ class Quiz(Base):
     __tablename__ = "quizzes"
 
     id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
-    document_id = Column(
+    notebook_id = Column(
         BIGINT(unsigned=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("notebooks.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = Column(
@@ -58,8 +58,12 @@ class Quiz(Base):
         String(20), nullable=False, default="processing", server_default="processing"
     )  # "processing" | "completed" | "failed"
 
+    # Snapshot document_ids đang active tại thời điểm generate (giống NotebookSummary),
+    # vì tập active của notebook có thể đổi sau khi quiz đã tạo xong.
+    source_document_ids = Column(JSON, nullable=False)  # [12, 15, 18]
+
     # Relationships
-    document = relationship("Document", back_populates="quizzes")
+    notebook = relationship("Notebook", back_populates="quizzes")
     user = relationship("User")
     questions = relationship(
         "QuizQuestion", back_populates="quiz", cascade="all, delete-orphan"

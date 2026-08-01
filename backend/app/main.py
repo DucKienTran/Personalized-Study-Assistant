@@ -11,9 +11,11 @@ from sqlalchemy.sql import text
 from app.api.auth import router as auth_router
 from app.api.conversation import router as conversation_router
 from app.api.documents import router as documents_router
+from app.api.notebooks import router as notebooks_router
 from app.api.quizzes import attempts_router as quiz_attempts_router
 from app.api.quizzes import router as quizzes_router
 from app.api.users import router as users_router
+from app.api.summaries import router as summaries_router
 from app.api.rag import router as rag_router
 from app.core.config import settings
 from app.core.database import Base, chroma_client, engine, mongo_client, redis_client
@@ -34,7 +36,7 @@ async def lifespan(app: FastAPI):
         configure_mappers()
         logger.info("SQLAlchemy: Mapping cấu trúc các Model thành công!")
 
-        Base.metadata.create_all(bind=engine)
+        # Base.metadata.create_all(bind=engine)
 
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -124,7 +126,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix=settings.API_STR)
 app.include_router(users_router, prefix=settings.API_STR)
+app.include_router(notebooks_router, prefix=settings.API_STR)
 app.include_router(documents_router, prefix=settings.API_STR)
+app.include_router(summaries_router, prefix = settings.API_STR)
 app.include_router(quizzes_router, prefix=settings.API_STR)
 app.include_router(quiz_attempts_router, prefix=settings.API_STR)
 app.include_router(rag_router, prefix=settings.API_STR)
