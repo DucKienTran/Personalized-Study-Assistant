@@ -1,3 +1,4 @@
+# scripts/seed_users.py
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
 
@@ -43,17 +44,16 @@ PERMISSIONS = [
     },
 ]
 
-# Example snippet update for seed script
 USERS = [
     {
         "email": "admin@example.com",
-        "password": "AdminPassword123!",
+        "password": "Abcd@1234",
         "full_name": "System Admin",
         "role_name": "admin",
     },
     {
         "email": "client@example.com",
-        "password": "ClientPassword123!",
+        "password": "Abcd@1234",
         "full_name": "Standard User",
         "role_name": "client",
     },
@@ -117,24 +117,22 @@ def seed_users(db: Session):
     roles = {role.name: role for role in db.query(Role).all()}
 
     for user_data in USERS:
-
         exists = db.query(User).filter(User.email == user_data["email"]).first()
 
         if exists:
             continue
 
         user = User(
-            username=user_data["username"],
             email=user_data["email"],
             password_hash=bcrypt.hash(user_data["password"]),
             full_name=user_data["full_name"],
-            role=roles[user_data["role"]],
+            role=roles[user_data["role_name"]],
             is_active=True,
         )
 
         db.add(user)
 
-        print(f"  [+] User: {user.username}")
+        print(f"  [+] User: {user.email}")
 
 
 def main():
