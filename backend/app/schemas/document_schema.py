@@ -24,10 +24,3 @@ class DocumentContentOut(BaseModel):
 
 class FileUrlOut(BaseModel):
     url: str
-
-
-class SummarizeRequest(BaseModel):
-    document_id: int
-    level: str = "normal"
-    format: str = "markdown"
-    instruction: Optional[str] = ""

@@ -14,13 +14,13 @@ Document Processing Constants
 #
 # We intentionally stay well below Gemini's context limit so
 # later AI services can combine multiple neighboring chunks.
-MAX_CHUNK_TOKENS = 450
+MAX_CHUNK_TOKENS = 1000
 
 # Minimum number of tokens before considering splitting.
 MIN_CHUNK_TOKENS = 120
 
 # If a section exceeds this value, it will be split.
-MAX_SECTION_TOKENS = 450
+MAX_SECTION_TOKENS = 1000
 
 # No overlap for V1.
 #

@@ -1,8 +1,12 @@
+import logging
+
 from langchain_core.documents import Document
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentChunkBuilder:
@@ -22,7 +26,7 @@ class DocumentChunkBuilder:
 
     def __init__(
         self,
-        chunk_size: int = 450,
+        chunk_size: int = 1000,
         chunk_overlap: int = 0,
     ) -> None:
 
@@ -55,5 +59,6 @@ class DocumentChunkBuilder:
         for section in sections:
             chunks = self.recursive_splitter.split_documents([section])
             final_chunks.extend(chunks)
-
+        logger.info(f"Header sections={len(sections)}")
+        logger.info(f"Final chunks={len(final_chunks)}")
         return final_chunks
