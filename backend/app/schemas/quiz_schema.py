@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class QuizGenerateRequest(BaseModel):
-    document_id: int
+    notebook_id: int
     mode: str  # "study" | "exam"
     generation_mode: str = "simple"  # "simple" | "custom"
 
@@ -51,7 +51,7 @@ class QuestionHintOut(BaseModel):  # schema list các hint của 1 Quiz
 class QuizProcessingOut(BaseModel):  # Schema hiển thị trạng thái tạo Quiz
     id: int
     title: str
-    document_title: str
+    notebook_title: str
     generation_mode: str
     difficulty: str
     total_questions: int
