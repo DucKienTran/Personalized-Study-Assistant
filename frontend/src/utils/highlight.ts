@@ -299,7 +299,9 @@ export function findSnippet(
  * Xóa marker cũ
  */
 export function clearHighlights(container: HTMLElement): void {
-  const markers = container.querySelectorAll("[data-rag-highlight='true']");
+  const markers = container.querySelectorAll(
+    "[data-rag-highlight='true'], .pdf-highlight-marker"
+  );
   markers.forEach((el) => el.remove());
 }
 
@@ -330,6 +332,7 @@ export function applyLineMarker(
 
   const marker = document.createElement("div");
   marker.className = "pdf-highlight-marker";
+  marker.dataset.ragHighlight = "true";
 
   Object.assign(marker.style, {
     position: "absolute",
@@ -337,9 +340,8 @@ export function applyLineMarker(
     width: "100%",
     top: `${topOffset}px`,
     height: `${markerHeight}px`,
-    backgroundColor: "rgba(253, 224, 71, 0.45)", // Nền vàng dịu
-    // YÊU CẦU UI 3: Thanh trang trí dọc 4px ở mép trái màu vàng đậm (#E6B800)
-    borderLeft: "4px solid #E6B800",
+    backgroundColor: "rgba(181, 118, 47, 0.22)",
+    borderLeft: "4px solid #B5762F",
     pointerEvents: "none",
     zIndex: "10",
     boxSizing: "border-box",
