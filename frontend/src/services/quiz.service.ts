@@ -12,8 +12,6 @@ interface ApiResponse<T> {
 
 export type Difficulty = "easy" | "medium" | "hard" | "mixed";
 
-export type GenerationMode = "simple" | "custom";
-
 export type QuizMode = "study" | "exam";
 
 export type GenerationStatus =
@@ -36,6 +34,22 @@ export type QuestionType =
     | "short_answer"
     | "essay";
 
+export type FeedbackTag =
+    | "too_hard"
+    | "too_easy"
+    | "repetitive"
+    | "not_relevant"
+    | "too_shallow"
+    | "too_long"
+    | "too_short"
+    | "not_enough_source_coverage"
+    | "hallucinated";
+
+export interface QuizFeedbackPayload {
+    tags: FeedbackTag[];
+    comment?: string;
+}
+
 /* =========================
  * Document
  * ========================= */
@@ -53,9 +67,19 @@ export interface QuizDocumentItem {
 export interface QuizItem {
     id: number;
 
+    notebook_id: number;
+
     title: string;
 
     mode: QuizMode;
+
+    total_questions: number;
+
+    time_limit_minutes?: number | null;
+
+    generation_strategy: "manual" | "ai_recommended";
+
+    difficulty_distribution: Record<string, number> | null;
 
     generation_status: GenerationStatus;
 
@@ -89,23 +113,23 @@ export interface ProcessingQuizItem {
  * ========================= */
 
 export interface GenerateQuizPayload {
-    document_id: number;
+    notebook_id: number;
 
-    generation_mode: GenerationMode;
+    generation_strategy: "manual";
 
     question_types: QuestionType[];
 
-    difficulty: Difficulty;
+    difficulty_distribution: Record<"easy" | "medium" | "hard", number>;
 
     total_questions: number;
 
-    target_total_points?: number | null;
+    target_total_points: number;
 
     mode: QuizMode;
 
-    time_limit_minutes?: number | null;
+    time_limit_minutes?: number;
 
-    custom_instruction?: string;
+    custom_instruction: string | null;
 }
 
 /* =========================
@@ -135,9 +159,14 @@ export const quizService = {
     /**
      * Danh sách quiz của user
      */
-    async listQuizzes() {
+    async listQuizzes(notebookId?: number) {
         const res = await api.get<ApiResponse<QuizItem[]>>(
-            "/quizzes"
+            "/quizzes",
+            {
+                params: notebookId === undefined
+                    ? undefined
+                    : { notebook_id: notebookId },
+            }
         );
 
         return res.data.data;
@@ -164,6 +193,17 @@ export const quizService = {
         );
 
         return res.data.data;
+    },
+
+    async delete(quizId: number) {
+        await api.delete<ApiResponse<null>>(`/quizzes/${quizId}`);
+    },
+
+    async submitFeedback(quizId: number, payload: QuizFeedbackPayload) {
+        await api.post<ApiResponse<unknown>>(
+            `/quizzes/${quizId}/feedback`,
+            payload
+        );
     },
 
     /**

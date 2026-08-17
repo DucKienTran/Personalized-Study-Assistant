@@ -65,23 +65,11 @@ export interface RAGQueryResponse {
  * Request gửi lên backend
  */
 export interface RAGQueryRequest {
-  query: string;
-
-  /**
-   * Nếu null -> search toàn bộ document của user
-   */
-  documentIds?: number[];
-
-  /**
-   * Số chunk cuối cùng lấy vào context
-   */
-  topK?: number;
-
-  /**
-   * Lịch sử hội thoại
-   */
-  chatHistory?: ChatHistoryItem[];
-  conversationId?: number;   
+    query: string;
+    notebookId: number;
+    topK?: number;
+    chatHistory?: ChatHistoryItem[];
+    conversationId?: number;
 }
 
 
@@ -120,6 +108,9 @@ export interface ChatMessage {
   isStreaming?: boolean;
 
   isError?: boolean;
+
+  isStopped?: boolean;
+
 }
 
 export interface ConversationSummary {
@@ -140,4 +131,14 @@ export interface ConversationDetail {
   id: number;
   title: string;
   messages: ConversationDetailMessage[];
+}
+
+export interface ChatError {
+  message: string;
+  retry?: () => void;
+}
+
+export interface AssistantSendRequest {
+  id: string;
+  content: string;
 }

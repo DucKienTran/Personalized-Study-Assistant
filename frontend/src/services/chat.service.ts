@@ -1,9 +1,10 @@
 import { CitationSource, ConversationDetail, ConversationSummary } from "@/types/chat";
 import { apiFetch } from "./api-fetch";
 import {
-    RAGQueryRequest,
-    RetrievalMetadata
+  RAGQueryRequest,
+  RetrievalMetadata
 } from "@/types/chat";
+
 interface BackendCitationSource {
   index: number;
   document_id: number;
@@ -16,30 +17,27 @@ interface BackendCitationSource {
 }
 
 export type CitationMap = Record<string, number>;
+
 export interface StreamCallbacks {
-    onConversationId?: (id: number) => void; 
-    onCitationMap?: (map: Record<string, number>) => void;
-    onSources?: (
-        sources: CitationSource[]
-    ) => void;
+  onConversationId?: (id: number) => void;
+  onCitationMap?: (map: Record<string, number>) => void;
+  onSources?: (
+    sources: CitationSource[]
+  ) => void;
 
+  onToken?: (
+    token: string
+  ) => void;
 
-    onToken?: (
-        token: string
-    ) => void;
+  onMetadata?: (
+    metadata: RetrievalMetadata
+  ) => void;
 
+  onError?: (
+    errorMessage: string
+  ) => void;
 
-    onMetadata?: (
-        metadata: RetrievalMetadata
-    ) => void;
-
-
-    onError?: (
-        errorMessage:string
-    ) => void;
-
-
-    onDone?:()=>void;
+  onDone?: () => void;
 }
 
 export function mapCitationSource(source: BackendCitationSource): CitationSource {
@@ -56,8 +54,9 @@ export function mapCitationSource(source: BackendCitationSource): CitationSource
 }
 
 class ChatService {
-  async listConversations(): Promise<ConversationSummary[]> {
-    const res = await apiFetch("/conversations", { method: "GET" });
+  async listConversations(notebookId?: number): Promise<ConversationSummary[]> {
+    const query = notebookId ? `?notebook_id=${notebookId}` : "";
+    const res = await apiFetch(`/conversations${query}`, { method: "GET" });
     if (!res.ok) throw new Error("Failed to load conversations");
     const data = await res.json();
     return data.map((c: any) => ({
@@ -65,6 +64,20 @@ class ChatService {
       title: c.title,
       updatedAt: c.updated_at,
     }));
+  }
+
+  async createConversation(notebookId: number): Promise<ConversationSummary> {
+    const res = await apiFetch("/conversations", {
+      method: "POST",
+      body: JSON.stringify({ notebook_id: notebookId }),
+    });
+    if (!res.ok) throw new Error("Failed to create conversation");
+    const conversation = await res.json();
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      updatedAt: conversation.updated_at,
+    };
   }
 
   async getConversation(id: number): Promise<ConversationDetail> {
@@ -128,43 +141,55 @@ class ChatService {
 
     return url;
   }
+
   async streamQuestion(
-      payload: RAGQueryRequest,
-      callbacks: StreamCallbacks
+    payload: RAGQueryRequest,
+    callbacks: StreamCallbacks,
+    signal?: AbortSignal,
   ): Promise<void> {
-      const response = await apiFetch(
-          "/rag/stream",
-          {
-              method: "POST",
-              body: JSON.stringify({
-                  query: payload.query,
-                  document_ids: payload.documentIds,
-                  top_k: payload.topK ?? 5,
-                  chat_history: payload.chatHistory,
-                  conversation_id: payload.conversationId,
-              }),
-          }
-      );
-
-      if (!response.ok || !response.body) {
-        throw new Error(
-          `Streaming request failed with status ${response.status}`
-        );
+    const response = await apiFetch(
+      "/rag/stream",
+      {
+        method: "POST",
+        signal,
+        body: JSON.stringify({
+          query: payload.query,
+          notebook_id: payload.notebookId,
+          top_k: payload.topK ?? 5,
+          chat_history: payload.chatHistory,
+          conversation_id: payload.conversationId,
+        }),
       }
+    );
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8");
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Streaming request failed with status ${response.status}`
+      );
+    }
 
-      let buffer = "";
-      let doneCalled = false;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
 
-      const notifyDone = () => {
-        if (!doneCalled) {
-          doneCalled = true;
-          callbacks.onDone?.();
-        }
-      };
+    let buffer = "";
+    let doneCalled = false;
 
+    const notifyDone = () => {
+      if (!doneCalled) {
+        doneCalled = true;
+        callbacks.onDone?.();
+      }
+    };
+
+    const abortHandler = () => {
+      void reader.cancel();
+    };
+
+    if (signal) {
+      signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
+    try {
       while (true) {
         const { value, done } = await reader.read();
 
@@ -222,9 +247,6 @@ class ChatService {
               case "sources": {
                 const parsed = JSON.parse(rawData);
 
-                // Support:
-                // 1. [...]
-                // 2. { data: [...] }
                 const rawSources: BackendCitationSource[] =
                   Array.isArray(parsed)
                     ? parsed
@@ -297,9 +319,12 @@ class ChatService {
 
       // Stream đóng tự nhiên nhưng backend không gửi done
       notifyDone();
+    } finally {
+      if (signal && abortHandler) {
+        signal.removeEventListener("abort", abortHandler);
+      }
     }
   }
+}
 
-  export const chatService = new ChatService();
-
-  
+export const chatService = new ChatService();

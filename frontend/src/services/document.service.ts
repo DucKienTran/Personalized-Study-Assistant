@@ -7,7 +7,22 @@ export interface DocumentListItem {
     title: string;
     status: string;
     file_type?: string;
+    file_size: number;
     created_at?: string;
+}
+
+export interface DocumentOutlineItem {
+    text: string;
+    level: number;
+    anchor: string;
+}
+
+export interface DocumentContent {
+    title: string;
+    file_type: string;
+    total_pages: number;
+    content_raw: string;
+    outline: DocumentOutlineItem[];
 }
 
 interface ApiResponse<T> {
@@ -37,6 +52,14 @@ export const documentService = {
         return res.data.data; 
     },
 
+    async createTextDocument(title: string, content: string): Promise<DocumentListItem> {
+        const res = await api.post<ApiResponse<DocumentListItem>>("/documents/paste-text", {
+            title,
+            content,
+        });
+        return res.data.data;
+    },
+
     async getDocument(id: number): Promise<DocumentListItem> {
         const res = await api.get<ApiResponse<DocumentListItem[]>>(
             "/documents/",
@@ -44,6 +67,11 @@ export const documentService = {
         );
 
         return res.data.data[0];
+    },
+
+    async getDocumentContent(id: number): Promise<DocumentContent> {
+        const res = await api.get<ApiResponse<DocumentContent>>(`/documents/${id}/content`);
+        return res.data.data;
     },
 
     async deleteDocument(id: number): Promise<void> {
@@ -55,6 +83,13 @@ export const documentService = {
         if (!res.ok) throw new Error("Failed to get document URL");
         const body = await res.json();
         return body.data.url;
-      }
+      },
+
+    async getDocumentDownloadUrl(documentId: number): Promise<string> {
+        const res = await apiFetch(`/documents/${documentId}/download-url`, { method: "GET" });
+        if (!res.ok) throw new Error("Failed to get document download URL");
+        const body = await res.json();
+        return body.data.url;
+    }
 };
 
