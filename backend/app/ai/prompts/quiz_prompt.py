@@ -1,243 +1,559 @@
-from typing import List, Optional
+# app/ai/prompts/quiz_prompt.py
+
+from __future__ import annotations
+
+from decimal import Decimal
+import json
+
+from app.ai.constants.quiz_profile import (
+    QUIZ_PROFILE_FIELDS,
+    QUIZ_PROFILE_SEMANTICS,
+)
 
 
 class QuizPromptBuilder:
     """
-    Sinh prompt cho việc tạo đề thi bằng AI, tách 2 nhánh: simple / custom.
-    Nguyên tắc: KHÔNG parse custom_instruction bằng code — để LLM tự hiểu ngôn ngữ tự nhiên,
-    backend chỉ ép ràng buộc CỨNG (tổng điểm, JSON schema, chống bịa nội dung).
+    Build the LLM prompt used to generate quizzes.
+
+    Responsibilities:
+    - Inject quiz configuration.
+    - Inject personalized quiz profile.
+    - Enforce hard business rules.
+    - Enforce output JSON schema.
     """
 
-    _JSON_SCHEMA_RULES = """
---- QUY TẮC ĐỊNH DẠNG CẤU TRÚC JSON (BẮT BUỘC) ---
-Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc sau:
+    _QUESTION_SCHEMA = """
+Each question MUST follow one of the following schemas.
+
+1. multiple_choice
 
 {
-  "quiz_title": "Tên bộ đề ngắn gọn",
-  "questions": [
-    {
-      ...
-    }
-  ]
+    "question_text": "...",
+    "question_type": "multiple_choice",
+    "options": [
+        "A. ...",
+        "B. ...",
+        "C. ...",
+        "D. ..."
+    ],
+    "correct_answer": "A",
+    "explanations": {
+        "A": "...",
+        "B": "...",
+        "C": "...",
+        "D": "..."
+    },
+    "points": 4,
+    "hint": "..."
 }
 
-Yêu cầu:
-- quiz_title: dưới 12 từ.
-- Phản ánh chủ đề chính của tài liệu.
-- Không dùng tên chung chung như "Đề thi", "Quiz", "Bài kiểm tra".
-nội dung tài liệu nguồn — KHÔNG dùng tên chung chung như "Đề thi", "Bài kiểm tra".
-Ví dụ tốt: "Kiểm tra chương 2: Cấu trúc dữ liệu và giải thuật"
-Nội dung trả về KHÔNG bọc trong markdown code fence.
-KHÔNG thêm bất kỳ chữ giải thích nào trước/sau khối JSON.
+------------------------------------------------
 
-Mỗi object câu hỏi PHẢI có đúng các field sau, tuỳ theo question_type:
+2. multiple_response
 
-1. "multiple_choice":
 {
-  "question_text": "...",
-  "question_type": "multiple_choice",
-  "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-  "correct_answer": "A",
-  "explanations": {"A": "...", "B": "...", "C": "...", "D": "..."},
-  "points": 4,
-  "hint": "..."
+    "question_text": "...",
+    "question_type": "multiple_response",
+    "options": [
+        "A. ...",
+        "B. ...",
+        "C. ...",
+        "D. ..."
+    ],
+    "correct_answer": [
+        "A",
+        "C"
+    ],
+    "explanations": {
+        "A": "...",
+        "B": "...",
+        "C": "...",
+        "D": "..."
+    },
+    "points": 4,
+    "hint": "..."
 }
 
-2. "multiple_response" (nhiều đáp án đúng):
+Rules:
+- Every question_text MUST end with an explicit instruction telling the student
+  that multiple answers may be correct, such as "Select all that apply." in
+  English or an equivalent phrase in the question's own language.
+- correct_answer MUST contain at least 2 elements and strictly fewer elements
+  than the total number of options - this is a MINIMUM of 2, not a fixed count.
+  3 or more correct answers are equally valid whenever the source supports it.
+  Vary the count across different multiple_response questions in the same quiz
+  instead of always using exactly 2.
+
+------------------------------------------------
+
+3. true_false
+
 {
-  "question_text": "...",
-  "question_type": "multiple_response",
-  "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-  "correct_answer": ["A", "C"],
-  "explanations": {"A": "...", "B": "...", "C": "...", "D": "..."},
-  "points": 4,
-  "hint": "..."
+    "question_text": "...",
+    "question_type": "true_false",
+    "options": null,
+    "statements": [
+        {
+            "text": "Statement 1",
+            "correct_answer": true,
+            "explanation": "..."
+        },
+        {
+            "text": "Statement 2",
+            "correct_answer": false,
+            "explanation": "..."
+        }
+    ],
+    "correct_answer": null,
+    "explanations": null,
+    "points": 2,
+    "hint": "..."
 }
 
-3. "true_false":
+Rules:
+- statements MUST contain one or more items.
+- Each statement MUST have its own Boolean correct_answer.
+- Use multiple statements whenever the source supports a meaningful grouped question.
+- Do not put a single Boolean answer at the question level.
+- Each true_false question MUST contain between 1 and 5 statements. Across all
+  true_false questions in the same quiz, treat statement counts 1, 2, 3, 4 and
+  5 as equally likely categories (approximately 20% each). Distribute these
+  five counts as evenly as mathematically possible instead of defaulting to 2.
+  For example, a quiz with exactly 10 true_false questions MUST contain exactly
+  2 questions with each statement count: two with 1, two with 2, two with 3,
+  two with 4 and two with 5. Audit the statement-count distribution before
+  returning the JSON.
+- All statements grouped inside one true_false question MUST assess the same
+  coherent topic or subtopic introduced by that question. They should examine
+  related aspects of one concept, process, comparison or case. Never combine
+  unrelated facts merely to reach a higher statement count.
+- Points MUST increase with the number of statements in a true_false question.
+  Within the same quiz, a question with more statements must be worth more than
+  one with fewer statements, while the points across all questions must still
+  equal the required target total exactly.
+- Within a single true_false question with multiple statements, avoid making
+  all statements share the same correct_answer (all true or all false) unless
+  the source content genuinely supports that. Vary the true/false distribution
+  both within each question and across the quiz's true_false questions.
+
+------------------------------------------------
+
+4. fill_blank
+
 {
-  "question_text": "...",
-  "question_type": "true_false",
-  "options": null,
-  "correct_answer": true,
-  "explanations": {"general": "..."},
-  "points": 2,
-  "hint": "..."
+    "question_text": "...[blank]...",
+    "question_type": "fill_blank",
+    "options": null,
+    "correct_answer": [
+        "...",
+        "..."
+    ],
+    "explanations": {
+        "general": "..."
+    },
+    "points": 3,
+    "hint": "..."
 }
 
-4. "fill_blank":
+Rules:
+- Each fill_blank question MUST contain exactly ONE blank in the question_text,
+  not multiple blanks in the same question. The correct_answer list is for
+  accepted phrasings/synonyms of THAT SINGLE blank and may contain any number of
+  accepted variants (2, 3, or more). This constraint only limits the number of
+  blanks per question, not how many accepted answers you provide for it.
+- The content that goes in the blank(s) MUST NOT appear anywhere else in the
+  question_text. Do not restate the answer before or after the blank. If the
+  source material's phrasing reveals the answer, rephrase the question so the
+  blank is the only place that information appears.
+
+------------------------------------------------
+
+5. short_answer
+
 {
-  "question_text": "Câu chứa [blank] cần điền.",
-  "question_type": "fill_blank",
-  "options": null,
-  "correct_answer": ["đáp án đúng 1", "cách viết chấp nhận được 2"],
-  "explanations": {"general": "..."},
-  "points": 3,
-  "hint": "..."
+    "question_text": "...",
+    "question_type": "short_answer",
+    "options": null,
+    "correct_answer": "3.14",
+    "explanations": {
+        "general": "..."
+    },
+    "points": 3,
+    "hint": "..."
 }
 
-5. "short_answer" (trả lời ngắn bằng số/ký hiệu, kiểu đề thi Toán):
-{
-  "question_text": "...",
-  "question_type": "short_answer",
-  "options": null,
-  "correct_answer": "3.14",
-  "explanations": {"general": "..."},
-  "points": 3,
-  "hint": "..."
-}
-LƯU Ý: correct_answer PHẢI có độ dài TỐI ĐA 4 ký tự (tính cả dấu trừ và dấu thập phân
-nếu có). Chỉ được sinh câu hỏi short_answer nếu đáp án đúng có thể biểu diễn gọn (kể cả 
-kết quả chính xác hay làm tròn) trong 4 ký tự (ví dụ: "12", "-5", "3.14", "0.5"). 
-KHÔNG sinh short_answer nếu đáp án tự nhiêndài hơn — trong trường hợp đó, đổi câu hỏi sang 
-dạng khác (fill_blank/multiple_choice/...) hoặc bỏ câu đó.
+Rules:
+- correct_answer MUST contain at most four characters.
+- Generate this type ONLY if the answer naturally fits this limit.
+- The exact correct_answer MUST NOT appear anywhere in the question_text. Do
+  not restate the answer elsewhere in the question. If the source material's
+  phrasing reveals the answer, rephrase the question so it must be supplied by
+  the student.
 
-6. "essay":
+------------------------------------------------
+
+6. essay
+
 {
-  "question_text": "...",
-  "question_type": "essay",
-  "options": null,
-  "correct_answer": ["Ý chính 1 cần có", "Ý chính 2 cần có", "Tiêu chí chấm điểm..."],
-  "explanations": null,
-  "points": 5,
-  "hint": "..."
+    "question_text": "...",
+    "question_type": "essay",
+    "options": null,
+    "correct_answer": [
+        "Expected point 1",
+        "Expected point 2"
+    ],
+    "explanations": null,
+    "points": 5,
+    "hint": "..."
 }
+
+Rules:
+- correct_answer MUST be a non-empty list of independently assessable expected points.
+- Each expected point must be directly supported by the source.
+- correct_answer should typically contain 2-5 independently assessable expected
+  points whenever the source material supports it, so partial-credit grading is
+  meaningful. Avoid reducing the rubric to a single all-or-nothing point unless
+  the question is genuinely too narrow to split further.
+"""
+
+    _OUTPUT_SCHEMA = """
+Return ONLY ONE valid JSON object.
+
+{
+    "quiz_title": "...",
+    "questions": [
+        ...
+    ]
+}
+
+Rules:
+
+- quiz_title must be a clean, concise, professional subject title in the
+  dominant language of the source material, ideally 3-12 words.
+- Output the title directly. Never prefix it with generic labels such as
+  "Quiz:", "Quiz -", "Test:", "Assessment:", or equivalent wording.
+- Never append parenthetical or contextual qualifiers such as
+  "(based on provided text)", "(based on the source material)",
+  "(dựa trên tài liệu đã cung cấp)", or equivalent phrases.
+- Do not wrap quiz_title in quotation marks or add trailing explanatory text.
+- No markdown.
+- No code fences.
+- No explanations.
+- No additional keys.
+- The JSON must be directly parseable.
 """
 
     _HARD_CONSTRAINTS = """
---- RÀNG BUỘC BẮT BUỘC PHẢI TUÂN THỦ ---
-1. Tổng điểm (points) của TẤT CẢ câu hỏi PHẢI cộng lại CHÍNH XÁC bằng: {target_total_points}.
-   Đây là ràng buộc cứng, không được sai lệch dù chỉ 1 điểm.
-2. Sinh đúng {total_questions} câu nếu có thể. Nếu tài liệu nguồn KHÔNG đủ nội dung để
-   sinh đủ số câu có chất lượng, hãy sinh ÍT HƠN thay vì bịa thêm nội dung không có
-   trong tài liệu. TUYỆT ĐỐI KHÔNG sinh NHIỀU HƠN số câu yêu cầu.
-3. Không được tự chế đề, câu hỏi bịa, hoặc câu hỏi mơ hồ không có căn cứ.
-4. Không được bịa đặt sự kiện/số liệu nằm ngoài nội dung tài liệu nguồn được cung cấp.
-5. Mọi đáp án và giải thích PHẢI có căn cứ trực tiếp từ nội dung tài liệu nguồn.
-6. Mỗi câu hỏi PHẢI kiểm tra một điểm kiến thức RIÊNG BIỆT. Không hỏi lại cùng 1 khái
-   niệm bằng cách diễn đạt khác nhau (trừ khi người dùng yêu cầu rõ điều này).
-7. KHÔNG được để lộ đáp án ngay trong nội dung câu hỏi (ví dụ: không mô tả định nghĩa
-   đầy đủ của khái niệm rồi hỏi lại chính khái niệm đó).
+==============================
+HARD REQUIREMENTS
+==============================
 
+1.
+Generate EXACTLY {total_questions} questions.
+
+2.
+The questions array MUST contain exactly {total_questions} objects.
+Never return fewer or more questions. Count the array items before responding.
+
+3.
+Never invent facts.
+
+4.
+Every question MUST be directly supported by the provided source.
+
+5.
+Every correct answer MUST be verifiable from the source.
+
+6.
+Every explanation MUST also be grounded in the source.
+
+7.
+Avoid duplicate questions.
+
+8.
+Avoid testing the same concept multiple times.
+
+9.
+Avoid answer leakage inside the question wording.
+
+10.
+Distractors must be plausible.
+
+11.
+Questions should naturally vary in wording.
+
+12.
+Questions should progressively cover different parts of the source.
+
+13.
+Do not copy long sentences verbatim unless necessary.
+
+14.
+Prefer conceptual understanding over trivial wording changes.
+
+15.
+Respect the requested question types.
+
+16.
+Respect the requested difficulty distribution.
+
+17.
+Respect the personalized quiz profile.
+
+18.
+If custom instructions conflict with the quiz profile,
+custom instructions have higher priority.
+
+19.
+Business constraints always override everything else.
+
+20.
+The total points of all generated questions MUST equal:
+
+{target_total_points}
+
+Do not exceed or fall below this value.
+Every question must have a positive point value with at most two decimal places.
+
+21.
+For multiple-choice questions, distribute correct_answer keys across A, B, C and D.
+Aim for roughly 25% per key, with each key representing between 10% and 40%
+of the multiple-choice answers whenever the question count makes that mathematically possible.
+For smaller sets, maximize balance and avoid repeatedly using the same key.
+Do not use predictable placement sequences such as A-B-C-D repeated in order.
+Audit and rebalance the answer-key distribution before returning the final JSON.
+
+22.
+For multiple_response questions, vary the number and position of correct answers
+across the quiz. Do not repeatedly use the same count, such as always exactly 2
+correct answers, or the same key pattern.
+
+23.
+For true_false questions, balance the ratio of true vs false statements across
+the whole quiz. Avoid a majority of statements sharing the same correct_answer
+value across all true_false questions combined.
 """
 
     @staticmethod
-    def _build_source_and_schema(
-        content_raw: str, target_total_points: int, total_questions: int
-    ) -> str:
-        constraints = QuizPromptBuilder._HARD_CONSTRAINTS.format(
-            target_total_points=target_total_points, total_questions=total_questions
-        )
-        return f"""
---- NỘI DUNG TÀI LIỆU NGUỒN ---
-{content_raw}
-{constraints}
-{QuizPromptBuilder._JSON_SCHEMA_RULES}
+    def _render_profile(profile: dict[str, float]) -> str:
+        lines = []
 
-Hãy bắt đầu sinh dữ liệu JSON ngay dưới đây:"""
+        for field in QUIZ_PROFILE_FIELDS:
+            lines.append(
+                f"""
+{field}: {profile[field]:.1f}/10
 
-    @staticmethod
-    def build_simple(
-        content_raw: str,
-        total_questions: int,
-        difficulty: str,  # "easy" | "medium" | "hard" | "mixed"
-        question_types: List[str],
-        target_total_points: int,
-    ) -> str:
-        difficulty_instruction = {
-            "easy": "Toàn bộ câu hỏi ở mức độ Nhận biết/Dễ.",
-            "medium": "Toàn bộ câu hỏi ở mức độ Thông hiểu/Trung bình.",
-            "hard": "Toàn bộ câu hỏi ở mức độ Vận dụng/Vận dụng cao/Khó.",
-            "mixed": (
-                "Trộn độ khó theo tỉ lệ: 40% Dễ (Nhận biết), 40% Trung bình (Thông hiểu), "
-                "20% Khó (Vận dụng/Vận dụng cao). KHÔNG gom nhóm các câu cùng độ khó lại "
-                "gần nhau — trộn ngẫu nhiên thứ tự trong toàn bộ đề."
-            ),
-        }.get(
-            difficulty,
-            "Độ khó trung bình, phù hợp trình độ phổ thông/đại học đại cương.",
-        )
-
-        types_instruction = (
-            f"Các dạng câu hỏi cần dùng: {', '.join(question_types)}.\n"
-            f"Nếu người dùng không chỉ định tỉ lệ cụ thể giữa các dạng, hãy PHÂN BỔ ĐỀU "
-            f"nhất có thể giữa {len(question_types)} dạng trên (ví dụ 15 câu, 3 dạng → 5-5-5; "
-            f"nếu chia không hết, phần dư phân bổ thêm vào dạng đầu tiên)."
-        )
-
-        header = f"""Bạn là chuyên gia khảo thí AI. Biên soạn bộ đề thi dựa trên tài liệu nguồn dưới đây theo cấu hình:
-
---- CẤU HÌNH (SIMPLE MODE) ---
-Số câu hỏi mong muốn: {total_questions}
-Độ khó: {difficulty_instruction}
-{types_instruction}
-"""
-        return header + QuizPromptBuilder._build_source_and_schema(
-            content_raw, target_total_points, total_questions
-        )
-
-    @staticmethod
-    def build_custom(
-        content_raw: str,
-        total_questions: int,
-        target_total_points: int,
-        custom_instruction: str,
-        question_types: Optional[List[str]] = None,
-        difficulty: Optional[str] = None,
-    ) -> str:
-        default_types = (
-            f"Mặc định nếu không được chỉ định trong yêu cầu: {', '.join(question_types)}."
-            if question_types
-            else ""
-        )
-        default_difficulty = (
-            f"Độ khó mặc định nếu không được chỉ định trong yêu cầu: {difficulty}."
-            if difficulty
-            else ""
-        )
-
-        header = f"""Bạn là chuyên gia khảo thí AI. Biên soạn bộ đề thi dựa trên tài liệu nguồn dưới đây.
-
---- YÊU CẦU TUỲ CHỈNH TỪ NGƯỜI DÙNG (ƯU TIÊN TUYỆT ĐỐI) ---
-{custom_instruction}
-
---- THỨ TỰ ƯU TIÊN KHI CÓ THÔNG TIN THIẾU HOẶC MÂU THUẪN ---
-Ưu tiên 1: Tuân theo ĐÚNG yêu cầu tuỳ chỉnh ở trên (loại câu hỏi, tỉ lệ %, độ khó, thứ tự sắp xếp...).
-Ưu tiên 2: Với bất kỳ thuộc tính nào yêu cầu tuỳ chỉnh KHÔNG đề cập tới, dùng cấu hình mặc định sau:
-{default_types}
-{default_difficulty}
-Số câu hỏi mong muốn (nếu yêu cầu tuỳ chỉnh không nói rõ số lượng): {total_questions}
-
-Nếu yêu cầu tuỳ chỉnh và cấu hình mặc định MÂU THUẪN nhau, LUÔN ưu tiên yêu cầu tuỳ chỉnh.
-"""
-        return header + QuizPromptBuilder._build_source_and_schema(
-            content_raw, target_total_points, total_questions
-        )
-
-    @staticmethod
-    def build(
-        generation_mode: str,
-        content_raw: str,
-        total_questions: int,
-        target_total_points: int,
-        question_types: Optional[List[str]] = None,
-        difficulty: Optional[str] = None,
-        custom_instruction: Optional[str] = None,
-    ) -> str:
-        if generation_mode == "custom":
-            return QuizPromptBuilder.build_custom(
-                content_raw=content_raw,
-                total_questions=total_questions,
-                target_total_points=target_total_points,
-                custom_instruction=custom_instruction or "Không có yêu cầu bổ sung.",
-                question_types=question_types,
-                difficulty=difficulty,
+Meaning:
+{QUIZ_PROFILE_SEMANTICS[field]}
+""".strip()
             )
 
-        return QuizPromptBuilder.build_simple(
-            content_raw=content_raw,
-            total_questions=total_questions,
-            difficulty=difficulty or "medium",
-            question_types=question_types or ["multiple_choice"],
-            target_total_points=target_total_points,
+        return "\n\n".join(lines)
+    @staticmethod
+    def build(
+        *,
+        document_title: str,
+        content: str,
+        quiz_profile: dict[str, float],
+        total_questions: int,
+        question_types: list[str],
+        difficulty_distribution: dict[str, float] | None,
+        target_total_points: Decimal,
+        mode: str,
+        generation_strategy: str,
+        generation_guidelines: str | None = None,
+        time_limit_minutes: int | None = None,
+    ) -> str:
+
+        difficulty_distribution_text = (
+            json.dumps(
+                difficulty_distribution,
+                indent=2,
+                ensure_ascii=False,
+            )
+            if difficulty_distribution
+            else "Model decides naturally."
         )
+
+        generation_guidelines_text = (
+            generation_guidelines.strip()
+            if generation_guidelines
+            else "None."
+        )
+
+        exam_section = ""
+
+        if mode == "exam":
+            exam_section = f"""
+==============================
+EXAM SETTINGS
+==============================
+
+Time limit:
+{time_limit_minutes} minutes
+
+The generated questions should be appropriate for a timed examination.
+
+Keep wording concise.
+
+Avoid unnecessary reading load.
+
+Avoid excessively long scenarios unless they are essential.
+"""
+
+        profile_text = QuizPromptBuilder._render_profile(
+            quiz_profile
+        )
+
+        return f"""
+You are an expert assessment designer.
+
+Your task is to generate a high-quality quiz based ONLY on the provided learning material.
+
+The quiz must balance educational value, diversity, correctness and personalization.
+
+==================================================
+DOCUMENT
+==================================================
+
+Title
+
+{document_title}
+
+Source
+
+{content}
+
+==================================================
+QUIZ CONFIGURATION
+==================================================
+
+Mode
+
+{mode}
+
+Generation strategy
+
+{generation_strategy}
+
+Target question count
+
+{total_questions}
+
+Allowed question types
+
+{", ".join(question_types)}
+
+Requested difficulty distribution
+
+{difficulty_distribution_text}
+
+Target total points
+
+{target_total_points}
+
+{exam_section}
+
+==================================================
+PERSONALIZED QUIZ PROFILE
+==================================================
+
+The following values describe the learner's long-term preferences inferred from previous quiz feedback.
+
+These values are NOT hard constraints.
+
+Instead, they should guide generation whenever possible.
+
+Examples:
+
+Higher difficulty
+→ increase reasoning complexity.
+
+Higher coverage
+→ sample more topics across the document.
+
+Higher anti_repetition
+→ avoid asking about the same knowledge twice.
+
+Higher reasoning_depth
+→ prefer application, analysis and synthesis over recall.
+
+Higher relevance
+→ stay focused on the document's core concepts.
+
+Higher time_per_question
+→ allow longer and more demanding questions.
+
+Higher strict_source_grounding
+→ every question and explanation should be directly verifiable from the source.
+
+Current learner profile
+
+{profile_text}
+
+==================================================
+USER GENERATION GUIDELINES
+==================================================
+
+{generation_guidelines_text}
+
+Priority order
+
+1. Hard business constraints.
+
+2. Parsed user generation guidelines.
+
+3. Personalized quiz profile.
+
+==================================================
+QUESTION QUALITY GUIDELINES
+==================================================
+
+Generate questions that genuinely evaluate understanding.
+
+Avoid superficial wording changes.
+
+Prefer conceptual diversity.
+
+Prefer covering different sections of the document.
+
+Mix factual recall, understanding and reasoning naturally.
+
+Create realistic distractors.
+
+Hints should help without revealing the answer.
+
+Explanations should explain WHY an answer is correct, not merely restate it.
+
+If multiple question types are requested, distribute them as evenly as possible unless the requested difficulty distribution naturally suggests otherwise.
+
+Do not force every question to have identical complexity.
+
+Maintain a smooth progression of difficulty.
+
+Hard questions should require combining multiple ideas from the document.
+
+Easy questions should still test meaningful knowledge.
+
+        {QuizPromptBuilder._HARD_CONSTRAINTS.format(
+    target_total_points=target_total_points,
+    total_questions=total_questions,
+)}
+
+==================================================
+QUESTION JSON SCHEMA
+==================================================
+
+{QuizPromptBuilder._QUESTION_SCHEMA}
+
+==================================================
+OUTPUT FORMAT
+==================================================
+
+{QuizPromptBuilder._OUTPUT_SCHEMA}
+
+FINAL CHECK: the questions array must contain exactly {total_questions} objects.
+Do not return the JSON until you have counted all {total_questions} questions.
+
+Begin generating the JSON now.
+"""

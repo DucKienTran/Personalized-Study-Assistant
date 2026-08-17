@@ -1,10 +1,9 @@
-from pydantic import BaseModel, ConfigDict
-
-from app.ai.constants import (
+from app.ai.constants.document_classification import (
     Category,
     Language,
     Purpose,
 )
+from pydantic import BaseModel, ConfigDict
 
 
 class ClassifierOutput(BaseModel):

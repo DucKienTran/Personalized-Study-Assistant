@@ -187,9 +187,7 @@ Digest:
             )
 
         instruction_text = (
-            f"\nAdditional user instruction:\n{instruction}"
-            if instruction
-            else ""
+            f"\nAdditional user instruction:\n{instruction}" if instruction else ""
         )
 
         return f"""

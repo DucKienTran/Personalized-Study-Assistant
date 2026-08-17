@@ -17,6 +17,7 @@ class GeminiClient(LLMClient):
     """
     Concrete implementation của LLMClient sử dụng Google Gemini.
     """
+
     def __init__(self) -> None:
         api_key = settings.GEMINI_API_KEY
 

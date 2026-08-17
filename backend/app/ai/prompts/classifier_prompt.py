@@ -1,4 +1,4 @@
-from app.ai.constants import (
+from app.ai.constants.document_classification import (
     CATEGORY_DESCRIPTIONS,
     PURPOSE_DEFINITIONS,
     Category,

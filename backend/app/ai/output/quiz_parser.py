@@ -1,8 +1,22 @@
+from decimal import Decimal
 import json
 import re
 from typing import ClassVar, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+
+
+class TrueFalseStatementSchema(BaseModel):
+    text: str
+    correct_answer: bool
+    explanation: Optional[str] = None
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Nội dung statement không được để trống.")
+        return value.strip()
 
 
 class QuizQuestionSchema(BaseModel):
@@ -18,9 +32,15 @@ class QuizQuestionSchema(BaseModel):
     question_text: str
     question_type: str
     options: Optional[List[str]] = None
-    correct_answer: Optional[Union[str, List[str], bool]] = None
+    correct_answer: Optional[Union[str, List[str], List[bool], bool]] = None
+    statements: Optional[List[TrueFalseStatementSchema]] = None
     explanations: Optional[Dict[str, str]] = None
-    points: int = Field(default=1, ge=1)
+    points: Decimal = Field(
+        default=Decimal("1.00"),
+        gt=0,
+        max_digits=12,
+        decimal_places=2,
+    )
     hint: Optional[str] = None
 
     @field_validator("question_type")
@@ -66,6 +86,9 @@ class QuizQuestionSchema(BaseModel):
                     "Trắc nghiệm multiple_response correct_answer phải là một mảng (List[str])."
                 )
 
+            if not self.correct_answer:
+                raise ValueError("multiple_response phải có ít nhất một đáp án đúng.")
+
             valid_labels = {opt.split(".")[0].strip() for opt in self.options}
             invalid = [a for a in self.correct_answer if a.strip() not in valid_labels]
             if invalid:
@@ -75,15 +98,9 @@ class QuizQuestionSchema(BaseModel):
                 )
 
         elif q_type == "true_false":
-            if not isinstance(ans, bool):
-                if str(ans).lower() in ["true", "1"]:
-                    self.correct_answer = True
-                elif str(ans).lower() in ["false", "0"]:
-                    self.correct_answer = False
-                else:
-                    raise ValueError(
-                        "true_false correct_answer bắt buộc phải là Boolean (True/False)."
-                    )
+            if not self.statements:
+                raise ValueError("true_false phải có ít nhất một statement.")
+            self.correct_answer = [statement.correct_answer for statement in self.statements]
 
         elif q_type == "fill_blank":
             if ans is None:
@@ -116,7 +133,12 @@ class QuizQuestionSchema(BaseModel):
                 )
 
         elif q_type == "essay":
-            pass
+            if not isinstance(ans, list) or not ans:
+                raise ValueError("essay correct_answer phải là danh sách rubric không rỗng.")
+            expected_points = [str(point).strip() for point in ans]
+            if any(not point for point in expected_points):
+                raise ValueError("Các rubric point của essay không được để trống.")
+            self.correct_answer = expected_points
 
         return self
 
