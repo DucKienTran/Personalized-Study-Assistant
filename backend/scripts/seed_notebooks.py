@@ -111,7 +111,9 @@ def seed_notebooks(db: Session, user: User, documents: dict[str, Document]):
             _link_document(db, notebook, documents[title], is_active=False)
 
 
-def _link_document(db: Session, notebook: Notebook, document: Document, is_active: bool):
+def _link_document(
+    db: Session, notebook: Notebook, document: Document, is_active: bool
+):
     link = (
         db.query(NotebookDocument)
         .filter_by(notebook_id=notebook.id, document_id=document.id)
