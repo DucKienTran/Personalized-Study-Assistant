@@ -74,6 +74,10 @@ export const ProgressActivityIcon = (props: IconWrapperProps) => (
   <Icon name="progress_activity" {...props} />
 );
 
+export const SidebarIcon = (props: IconWrapperProps) => (
+  <Icon name="dock_to_right" {...props} />
+);
+
 /* ============================================================
  * Legacy Icons (Mapped to Material Symbols)
  * ========================================================== */
@@ -205,3 +209,36 @@ export const CheckedBoxIcon = (props: IconWrapperProps) => (
 export const UncheckedBoxIcon = (props: IconWrapperProps) => (
   <Icon name="check_box_outline_blank" {...props} />
 );
+
+/* ============================================================
+ * Top Navigation Icons (Mapped to Material Symbols)
+ * ========================================================== */
+
+export const HomeIcon = (props: IconWrapperProps) => (
+  <Icon name="home" {...props} />
+);
+
+export const LibraryIcon = (props: IconWrapperProps) => (
+  <Icon name="menu_book" {...props} />
+);
+
+export const AutoStoriesIcon = (props: IconWrapperProps) => (
+  <Icon name="auto_stories" {...props} />
+);
+
+export const StatsIcon = (props: IconWrapperProps) => (
+  <Icon name="bar_chart" {...props} />
+);
+
+export const MenuIcon = (props: IconWrapperProps) => (
+  <Icon name="menu" {...props} />
+);
+
+export const HistoryIcon = (props: IconWrapperProps) => (
+  <Icon name="history" {...props} />
+);
+
+export const StopIcon = (props: IconWrapperProps) => (
+  <Icon name="stop" {...props} />
+);
+

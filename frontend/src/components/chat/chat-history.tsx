@@ -6,11 +6,15 @@ import {
   CitationSource,
 } from "@/types/chat";
 import { ChatMessage } from "./chat-message";
-import { MessageSquare, Trash2 } from "lucide-react";
+import { ChatStopSeparator } from "./chat-stop-separator";
+import { ChatErrorMessage } from "./chat-error-message";
+import { ChatError } from "@/hooks/useChat";
+import { MessageSquare } from "lucide-react";
 
 interface ChatHistoryProps {
   messages: ChatMessageType[];
   isLoading?: boolean;
+  chatError?: ChatError | null;
   onCitationClick?: (source: CitationSource) => void;
   onClear?: () => void;
 }
@@ -18,8 +22,8 @@ interface ChatHistoryProps {
 export const ChatHistory: React.FC<ChatHistoryProps> = ({
   messages,
   isLoading = false,
+  chatError,
   onCitationClick,
-  onClear,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -27,20 +31,20 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     bottomRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages, chatError]);
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[#EDF6F0] px-6 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#8FCFA9]/20 text-[#5DAA7B]">
+      <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center bg-background px-6 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <MessageSquare size={26} />
         </div>
 
-        <h3 className="text-base font-semibold text-gray-700">
+        <h3 className="text-base font-semibold text-foreground">
           No messages yet
         </h3>
 
-        <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">
+        <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           Ask a question about your uploaded documents to start chatting with
           LearningAid AI.
         </p>
@@ -49,19 +53,38 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   }
 
   return (
-    <div className="relative flex-1 overflow-y-auto bg-[#EDF6F0]">
-
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-8 pb-36">
+    <div className="notebook-sidebar-scroll absolute inset-0 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-background">
+      <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col px-4 pt-8 sm:px-6">
         {messages.map((message) => (
-          <ChatMessage
+          <div
             key={message.id}
-            message={message}
-            onCitationClick={onCitationClick}
-          />
+            className={message.sender === "user" ? "mb-6" : "mb-10"}
+          >
+            {!(message.sender === "ai" && message.isStopped) && (
+              <ChatMessage
+                message={message}
+                onCitationClick={onCitationClick}
+              />
+            )}
+
+            {message.sender === "ai" && message.isStopped && (
+              <ChatStopSeparator />
+            )}
+          </div>
         ))}
 
-        <div ref={bottomRef} />
+        {chatError && (
+          <ChatErrorMessage
+            message={chatError.message}
+            onRetry={chatError.retry}
+          />
+        )}
+
+        <div
+          ref={bottomRef}
+          className="h-[calc(2.75rem+1rem+1.5rem)] shrink-0"
+        />
       </div>
     </div>
   );
-};  
+};

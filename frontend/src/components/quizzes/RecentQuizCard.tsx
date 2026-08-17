@@ -36,7 +36,7 @@ export default function RecentQuizCard({
                     </span>
 
                     <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold text-gray-900">
+                        <h3 className="truncate py-px text-sm font-semibold leading-[1.5] text-gray-900">
                             {quiz.title}
                         </h3>
 
@@ -76,6 +76,8 @@ export default function RecentQuizCard({
     const targetHref =
         quiz.mode === "exam" && quiz.derived_status !== "completed"
             ? `/quizzes/${quiz.id}/exam`
+            : quiz.mode === "exam"
+                ? `/notebooks/${quiz.notebook_id}?tab=quizzes&quizId=${quiz.id}`
             : `/quizzes/${quiz.id}`;
 
     return (

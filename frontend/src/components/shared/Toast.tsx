@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/shared/icons";
 
 /**
  * Toast dùng chung toàn hệ thống.
  *
  * LÝ DO TỒN TẠI: window.alert()/window.confirm() là dialog native của trình duyệt,
- * khi bật lên sẽ khiến window bắn sự kiện `blur-sm` thật (mất focus cấp OS/browser-chrome),
+ * khi bật lên sẽ khiến window bắn sự kiện `blur` thật (mất focus cấp OS/browser-chrome),
  * gây tính nhầm vi phạm trong cơ chế chống gian lận Exam Mode. Toast render thuần trong
  * DOM của trang nên KHÔNG bao giờ gây window.blur.
  *
@@ -27,70 +28,33 @@ export interface ToastItem {
 
 const VARIANT_STYLE: Record<
     ToastVariant,
-    { bg: string; border: string; text: string; iconWrap: string; bar: string }
+    { border: string; iconWrap: string; bar: string; icon: string }
 > = {
     info: {
-        bg: "bg-white",
-        border: "border-blue-200",
-        text: "text-blue-600",
-        iconWrap: "bg-blue-50 text-blue-600",
-        bar: "bg-blue-400",
+        border: "border-primary/25",
+        iconWrap: "bg-primary/10 text-primary",
+        bar: "bg-primary",
+        icon: "info",
     },
     warning: {
-        bg: "bg-white",
-        border: "border-amber-200",
-        text: "text-amber-700",
-        iconWrap: "bg-amber-50 text-amber-700",
-        bar: "bg-amber-400",
+        border: "border-accent/30",
+        iconWrap: "bg-accent/10 text-accent",
+        bar: "bg-accent",
+        icon: "warning",
     },
     danger: {
-        bg: "bg-white",
-        border: "border-red-200",
-        text: "text-red-600",
-        iconWrap: "bg-red-50 text-red-600",
-        bar: "bg-red-500",
+        border: "border-destructive/30",
+        iconWrap: "bg-destructive/10 text-destructive",
+        bar: "bg-destructive",
+        icon: "error_outline",
     },
     success: {
-        bg: "bg-white",
-        border: "border-emerald-200",
-        text: "text-emerald-700",
-        iconWrap: "bg-emerald-100 text-emerald-700",
-        bar: "bg-emerald-500",
+        border: "border-chart-2/30",
+        iconWrap: "bg-chart-2/10 text-chart-2",
+        bar: "bg-chart-2",
+        icon: "check_circle",
     },
 };
-
-// Icon Heroicons-outline (strokeWidth 1.5), inline để không phụ thuộc icons.tsx
-// TODO: nếu muốn đồng bộ tuyệt đối, chuyển 4 icon này sang components/shared/icons.tsx
-function VariantIcon({ variant }: { variant: ToastVariant }) {
-    const common = { className: "w-5 h-5", strokeWidth: 1.5, stroke: "currentColor", fill: "none", viewBox: "0 0 24 24" };
-    switch (variant) {
-        case "warning":
-            return (
-                <svg {...common}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.007M10.29 3.86l-8.18 14.18A1.5 1.5 0 003.5 20.5h17a1.5 1.5 0 001.39-2.46L13.71 3.86a1.5 1.5 0 00-2.42 0z" />
-                </svg>
-            );
-        case "danger":
-            return (
-                <svg {...common}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376C1.83 17.938 2.905 20 4.697 20h14.606c1.792 0 2.867-2.062 1.9-3.874L14.5 4.876c-.896-1.68-3.104-1.68-4 0L2.697 16.126z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007" />
-                </svg>
-            );
-        case "success":
-            return (
-                <svg {...common}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l1.5 1.5 3.75-3.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            );
-        default:
-            return (
-                <svg {...common}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                </svg>
-            );
-    }
-}
 
 /** 1 toast đơn, có thanh tiến độ tự đếm ngược tới lúc auto-dismiss */
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: number) => void }) {
@@ -114,27 +78,25 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
     return (
         <div
             role="alert"
-            className={`pointer-events-auto w-full max-w-sm overflow-hidden rounded-2xl border ${style.border} ${style.bg} shadow-xl transition-all duration-300 ease-out ${
+            className={`pointer-events-auto w-full max-w-sm overflow-hidden rounded-xl border bg-card text-card-foreground ${style.border} shadow-lg transition-all duration-300 ease-out ${
                 mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
             }`}
         >
             <div className="flex items-start gap-3 p-4">
-                <span className={`shrink-0 p-2 rounded-xl ${style.iconWrap}`}>
-                    <VariantIcon variant={toast.variant} />
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] ${style.iconWrap}`}>
+                    <Icon name={style.icon} className="text-xl" />
                 </span>
-                <p className="flex-1 text-sm text-gray-700 leading-snug pt-1 whitespace-pre-line">{toast.message}</p>
+                <p className="flex-1 whitespace-pre-line pt-1 text-sm leading-snug text-foreground">{toast.message}</p>
                 <button
                     type="button"
                     onClick={() => onDismiss(toast.id)}
-                    className="shrink-0 p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-colors active:scale-95"
-                    aria-label="Đóng thông báo"
+                    className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Dismiss notification"
                 >
-                    <svg className="w-4 h-4" strokeWidth={1.5} stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <Icon name="close" className="text-base" />
                 </button>
             </div>
-            <div className="h-1 w-full bg-gray-100">
+            <div className="h-1 w-full bg-muted">
                 <div
                     className={`h-full ${style.bar} transition-all ease-linear`}
                     style={{

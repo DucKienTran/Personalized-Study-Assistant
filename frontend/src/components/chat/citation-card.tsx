@@ -55,13 +55,13 @@
     return (
       <div
         id={`citation-${source.index}`}
-        className="relative group"
+        className="group relative min-w-0 max-w-full"
       >
         <button
           type="button"
           onClick={() => onClick?.(source)}
           className={`
-            flex items-center gap-2
+            flex min-w-0 max-w-full items-center gap-2 overflow-hidden
             rounded-xl
             border
             px-3
@@ -86,7 +86,7 @@
             [{source.index}]
           </span>
 
-          <span className="max-w-[170px] truncate">
+          <span className="min-w-0 max-w-[170px] flex-1 truncate">
             {source.documentTitle}
           </span>
 
@@ -109,7 +109,7 @@
             bottom-full
             mb-3
             z-30
-            w-[360px]
+            w-[min(360px,calc(100vw-3rem))]
 
             rounded-2xl
             border

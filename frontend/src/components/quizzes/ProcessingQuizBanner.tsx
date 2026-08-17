@@ -138,7 +138,7 @@ export default function ProcessingQuizBanner({
                         >
                             <div className="flex items-start justify-between gap-4 mb-3">
                                 <div className="min-w-0">
-                                    <h3 className="truncate text-sm font-semibold text-gray-900">
+                                    <h3 className="truncate py-px text-sm font-semibold leading-[1.5] text-gray-900">
                                         {quiz.title}
                                     </h3>
 
