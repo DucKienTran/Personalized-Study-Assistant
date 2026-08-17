@@ -1,22 +1,36 @@
 from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class RAGQueryRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="Câu hỏi của người dùng")
-    notebook_id: int = Field(..., description="Notebook đang chat")
-    document_ids: Optional[List[int]] = Field(
-        None,
-        description=(
-            "Override tùy chọn: chỉ dùng chunk từ các document_id này. "
-            "Nếu bỏ trống, service tự lấy toàn bộ document đang is_active=True trong notebook."
-        ),
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Câu hỏi của người dùng",
     )
-    top_k: int = Field(5, ge=1, le=20, description="Số lượng chunk lấy ra")
+
+    notebook_id: int = Field(
+        ...,
+        description="Notebook dùng làm phạm vi tìm kiếm",
+    )
+
+    top_k: int = Field(
+        5,
+        ge=1,
+        le=20,
+        description="Số lượng chunk retrieval",
+    )
+
     chat_history: Optional[List[Dict[str, str]]] = Field(
-        None, description="Lịch sử hội thoại"
+        default=None,
+        description="Lịch sử hội thoại",
     )
-    conversation_id: Optional[int] = None
+
+    conversation_id: Optional[int] = Field(
+        default=None,
+        description="Conversation hiện tại",
+    )
 
 
 class CitationSourceSchema(BaseModel):
@@ -33,6 +47,9 @@ class CitationSourceSchema(BaseModel):
 class RAGMetadataSchema(BaseModel):
     original_query: str
     rewritten_query: Optional[str] = None
+    notebook_id: int
+    active_document_count: int
+    active_document_ids: List[int]
     retrieved_chunks: int = 0
     context_chunks: int = 0
     used_reranker: bool = False
@@ -40,5 +57,7 @@ class RAGMetadataSchema(BaseModel):
 
 class RAGQueryResponse(BaseModel):
     answer: str
-    sources: list[CitationSourceSchema]
+
+    sources: List[CitationSourceSchema]
+
     metadata: Optional[RAGMetadataSchema] = None

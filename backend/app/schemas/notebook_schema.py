@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.document_schema import DocumentOut
 
-
 # ---------------------------------------------------------------------------
 # Request
 # ---------------------------------------------------------------------------
@@ -19,6 +18,7 @@ class NotebookCreate(BaseModel):
         pattern=r"^#[0-9A-Fa-f]{6}$",
     )
 
+
 class NotebookUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
@@ -27,10 +27,9 @@ class NotebookUpdate(BaseModel):
         pattern=r"^#[0-9A-Fa-f]{6}$",
     )
 
+
 class AddDocumentsToNotebookRequest(BaseModel):
-    document_ids: list[int] = Field(
-        ..., description="Danh sách document_id thêm vào notebook"
-    )
+    document_ids: list[int] = Field(..., description="Danh sách document_id thêm vào notebook")
 
 
 class ToggleDocumentActiveRequest(BaseModel):
@@ -74,6 +73,7 @@ class NotebookOut(BaseModel):
 
 class NotebookDetailOut(BaseModel):
     """Dùng cho trang workspace của 1 notebook (sidebar document list)."""
+
     id: int
     title: str
     description: Optional[str] = None

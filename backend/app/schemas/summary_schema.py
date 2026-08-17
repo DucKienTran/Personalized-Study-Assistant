@@ -66,18 +66,19 @@ class NotebookSummaryOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class NotebookSummaryDetail(BaseModel): 
-    """ Chi tiết của một bản Summary bao gồm cả nội dung từ MongoDB. """ 
-    id: int 
-    notebook_id: int 
+
+class NotebookSummaryDetail(BaseModel):
+    """Chi tiết của một bản Summary bao gồm cả nội dung từ MongoDB."""
+
+    id: int
+    notebook_id: int
     notebook_title: str
     title: str
-    level: str 
-    format: str 
-    instruction: Optional[str] = "" 
-    summary_text: str 
-    draft_text: Optional[str] = None 
-    created_at: datetime 
+    level: str
+    format: str
+    instruction: Optional[str] = ""
+    summary_text: str
+    draft_text: Optional[str] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-

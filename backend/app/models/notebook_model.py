@@ -28,10 +28,10 @@ class Notebook(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     color = Column(
-            String(20),
-            nullable=False,
-            default="#3C6543",   # Moss Green
-        )
+        String(20),
+        nullable=False,
+        default="#3C6543",  # Moss Green
+    )
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
     updated_at = Column(
         TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False
@@ -85,7 +85,6 @@ class NotebookDocument(Base):
     # Quan hệ
     notebook = relationship("Notebook", back_populates="notebook_documents")
     document = relationship("Document", back_populates="notebook_documents")
-
 
 
 class NotebookSummary(Base):

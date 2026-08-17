@@ -29,5 +29,9 @@ class ConversationDetail(BaseModel):
     messages: list[MessageOut]
 
 
+class CreateConversationRequest(BaseModel):
+    notebook_id: int
+
+
 class RenameConversationRequest(BaseModel):
     title: str
