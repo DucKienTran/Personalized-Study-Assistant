@@ -15,6 +15,8 @@ from app.ai.embeddings.base import BaseEmbeddingClient
 from app.ai.embeddings.voyage_client import VoyageEmbeddingClient
 from app.ai.llm.azure_openai_client import AzureOpenAIClient
 from app.ai.llm.base import LLMClient
+from app.ai.prompts.quiz_prompt import QuizPromptBuilder
+from app.core.config import settings
 
 # --- INFRASTRUCTURE ---
 from app.core.database import SessionLocal, chroma_client, mongo_client, redis_client
@@ -26,21 +28,28 @@ from app.exceptions import (
 )
 from app.exceptions.auth import InvalidTokenError
 from app.schemas.user_schema import CurrentUser
+from app.services.auth_service import AuthService
+from app.services.dashboard.dashboard_insight_service import DashboardInsightService
+from app.services.dashboard.dashboard_service import DashboardService
 
 # --- SERVICES ---
-from app.services.ai.classifier_service import AIClassifier
-from app.services.ai.embedding_service import EmbeddingService
-from app.services.ai.quiz_service import QuizService
-from app.services.ai.rag_service import RAGService
-from app.services.ai.retrieval_service import RetrievalService
-from app.services.auth_service import AuthService
-from app.services.conversation_service import ConversationService
+from app.services.document.classifier_service import AIClassifier
 from app.services.document.document_processing_service import DocumentProcessingService
 from app.services.document.document_service import DocumentService
+from app.services.document.embedding_service import EmbeddingService
 from app.services.document.parser import DocumentParserService
 from app.services.email_service import EmailService
 from app.services.notebook.notebook_service import NotebookService
 from app.services.presence_service import PresenceService
+from app.services.quiz.chunk_selector import QuizChunkSelector
+from app.services.quiz.feedback_service import FeedbackService
+from app.services.quiz.instruction_parser import QuizInstructionParser
+from app.services.quiz.personal_offset_service import PersonalOffsetService
+from app.services.quiz.quiz_pipeline import QuizPipeline
+from app.services.quiz.quiz_service import QuizService
+from app.services.rag.conversation_service import ConversationService
+from app.services.rag.rag_service import RAGService
+from app.services.rag.retrieval_service import RetrievalService
 from app.services.summary.summary_record_service import SummaryRecordService
 from app.services.summary.summary_service import SummaryService
 from app.services.user_service import UserService
@@ -200,8 +209,8 @@ def get_notebook_service(
 NotebookServiceDep = Annotated[NotebookService, Depends(get_notebook_service)]
 
 
-def get_presence_service(redis: RedisDep) -> PresenceService:
-    return PresenceService(redis)
+def get_presence_service(redis: RedisDep, db: DbSession) -> PresenceService:
+    return PresenceService(redis=redis, db=db)
 
 
 PresenceServiceDep = Annotated[PresenceService, Depends(get_presence_service)]
@@ -299,6 +308,25 @@ DocumentProcessingServiceDep = Annotated[
 ]
 
 
+def get_dashboard_service(db: Session = Depends(get_db)) -> DashboardService:
+    return DashboardService(db)
+
+
+DashboardServiceDep = Annotated[DashboardService, Depends(get_dashboard_service)]
+
+
+def get_dashboard_insight_service(
+    db: DbSession,
+    llm_client: LLMClientDep,
+) -> DashboardInsightService:
+    return DashboardInsightService(db=db, llm_client=llm_client)
+
+
+DashboardInsightServiceDep = Annotated[
+    DashboardInsightService, Depends(get_dashboard_insight_service)
+]
+
+
 def get_summary_service(
     db: DbSession,
     mongo_db: MongoDbDep,
@@ -326,17 +354,64 @@ def get_summary_record_service(
     return SummaryRecordService(sql_db=db, mongo_db=mongo_db)
 
 
-SummaryRecordServiceDep = Annotated[
-    SummaryRecordService, Depends(get_summary_record_service)
-] 
+SummaryRecordServiceDep = Annotated[SummaryRecordService, Depends(get_summary_record_service)]
+
+
+
+
+def get_personal_offset_service(
+    db: DbSession,
+) -> PersonalOffsetService:
+    return PersonalOffsetService(
+        db=db,
+    )
+
+
+PersonalOffsetServiceDep = Annotated[
+    PersonalOffsetService,
+    Depends(get_personal_offset_service),
+]
+
+def get_feedback_service(
+    llm: LLMClientDep,
+    personal_offset_service: PersonalOffsetServiceDep,
+):
+    return FeedbackService(
+        llm=llm,
+        personal_offset_service=personal_offset_service,
+    )
+
+
+FeedbackServiceDep = Annotated[
+    FeedbackService,
+    Depends(get_feedback_service),
+]
+
+def get_quiz_pipeline(
+    chroma_client: ChromaClientDep,
+    llm_client: LLMClientDep,
+    embedding_service: EmbeddingServiceDep,
+) -> QuizPipeline:
+    return QuizPipeline(
+        llm=llm_client,
+        chunk_selector=QuizChunkSelector(
+            chroma_client=chroma_client,
+            collection_name=settings.CHROMA_COLLECTION_NAME,
+            embedding_service=embedding_service,
+        ),
+        prompt_builder=QuizPromptBuilder(),
+        instruction_parser=QuizInstructionParser(llm_client),
+    )
+
+
+QuizPipelineDep = Annotated[QuizPipeline, Depends(get_quiz_pipeline)]
 
 
 def get_quiz_service(
     db: DbSession,
-    document_service: DocumentServiceDep,
-    llm_client: LLMClientDep,
+    quiz_pipeline: QuizPipelineDep,
 ) -> QuizService:
-    return QuizService(db, document_service, llm_client)
+    return QuizService(db=db, quiz_pipeline=quiz_pipeline)
 
 
 QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service)]

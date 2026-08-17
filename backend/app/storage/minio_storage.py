@@ -100,11 +100,13 @@ class MinIOStorageService(StorageService):
         self,
         object_name: str,
         expires: timedelta = timedelta(minutes=15),
+        response_headers: dict[str, str] | None = None,
     ) -> str:
         url = self.client.presigned_get_object(
             bucket_name=self.bucket_name,
             object_name=object_name,
             expires=expires,
+            response_headers=response_headers,
         )
 
         parsed = urlparse(url)

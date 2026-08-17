@@ -57,6 +57,7 @@ class StorageService(ABC):
         self,
         object_name: str,
         expires: timedelta = timedelta(minutes=15),
+        response_headers: dict[str, str] | None = None,
     ) -> str:
         """
         Generate a short-lived, publicly-accessible URL for an object.

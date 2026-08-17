@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     AZURE_OPENAI_BASE_URL: str
     AZURE_OPENAI_CHAT_MODEL: str
+    AZURE_OPENAI_MAX_OUTPUT_TOKENS: int = 32768
     AZURE_OPENAI_API_KEY: str = ""
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_VERSION: str = "2025-04-01-preview"
@@ -80,10 +81,12 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str
 
     # Chunking
-    CHARS_PER_PAGE: str
+    CHARS_PER_PAGE: int
 
     # Rag
     RAG_TOP_K: int = 5
+    RAG_EVALUATION_ENABLED: bool = False
+    RAG_EVALUATION_OUTPUT_DIR: str = "evaluation/output"
 
     # SMTP Settings
     SMTP_HOST: str = "smtp.gmail.com"

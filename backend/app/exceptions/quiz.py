@@ -16,3 +16,14 @@ class InvalidQuizOperationError(BadRequestError):
 
     def __init__(self, message: str = "Hành động không hợp lệ với chế độ của đề thi."):
         super().__init__(message)
+
+class QuizPipelineError(Exception):
+    pass
+
+
+class QuizValidationError(QuizPipelineError):
+    pass
+
+
+class QuizParseError(QuizPipelineError):
+    pass
