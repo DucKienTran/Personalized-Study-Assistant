@@ -36,3 +36,6 @@ app.log
 # các file uploads
 uploads/
 chroma_storage/
+
+# Evaluation traces are generated artifacts and may contain document metadata.
+evaluation/output/*.jsonl
