@@ -4,10 +4,18 @@ import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/services/api";
 import QuizQuestionCard from "@/components/quizzes/QuizQuestionCard";
-import ExamQuestionCard from "@/components/quizzes/ExamQuestionCard";
 import ExamSidebar from "@/components/quizzes/ExamSidebar";
 import { useToast, ToastContainer } from "@/components/shared/Toast";
 import ConfirmButton from "@/components/shared/ConfirmButton";
+import { Icon } from "@/components/shared/icons";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Option {
     id: string | number;
@@ -18,17 +26,21 @@ interface QuizQuestion {
     id: number;
     question_text: string;
     question_type: string;
-    options: Option[];
+    options: Option[] | null;
+    statements?: Array<{ text: string; correct_answer?: boolean; explanation?: string }> | null;
     correct_answer: any;
     explanations: any;
     user_answer?: any;
     is_correct?: boolean | null;
     points?: number;
     hint?: string;
+    awarded_points?: number | null;
+    ai_feedback?: string | null;
 }
 
 interface QuizDetails {
     id: number;
+    notebook_id: number;
     title: string;
     mode: "study" | "exam";
     total_questions: number;
@@ -47,7 +59,7 @@ export default function QuizDoingPage({ params }: Props) {
 
     const [quiz, setQuiz] = useState<QuizDetails | null>(null);
     const [loading, setLoading] = useState(true);
-    const [answers, setAnswers] = useState<Record<number, string | number>>({});
+    const [answers, setAnswers] = useState<Record<number, unknown>>({});
     const [submitting, setSubmitting] = useState(false);
     const [examResult, setExamResult] = useState<any>(null);
 
@@ -55,6 +67,7 @@ export default function QuizDoingPage({ params }: Props) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [markedReview, setMarkedReview] = useState<Record<number, boolean>>({});
     const [markedCritical, setMarkedCritical] = useState<Record<number, boolean>>({});
+    const [showExamRules, setShowExamRules] = useState(false);
 
     // QUẢN LÝ BẢO MẬT & CHỐNG GIAN LẬN (PROCTORING SHIELD)
     const [violations, setViolations] = useState(0);
@@ -64,14 +77,21 @@ export default function QuizDoingPage({ params }: Props) {
 
     // Sử dụng Refs để lưu dữ liệu tức thời tránh bug stale closure trong event listeners
     const answersRef = useRef(answers);
+    const markedReviewRef = useRef(markedReview);
+    const markedCriticalRef = useRef(markedCritical);
     const quizRef = useRef(quiz);
     const isSubmittedRef = useRef(false);
+    const violationsRef = useRef(violations);
+    const lastViolationAtRef = useRef(0);
 
     const { toasts, showToast, dismissToast } = useToast();
 
 
     useEffect(() => { answersRef.current = answers; }, [answers]);
+    useEffect(() => { markedReviewRef.current = markedReview; }, [markedReview]);
+    useEffect(() => { markedCriticalRef.current = markedCritical; }, [markedCritical]);
     useEffect(() => { quizRef.current = quiz; }, [quiz]);
+    useEffect(() => { violationsRef.current = violations; }, [violations]);
     
     const isSubmitted = quiz?.mode === "study"
         ? (quiz.questions && Object.keys(answers).length >= quiz.questions.length)
@@ -84,12 +104,18 @@ export default function QuizDoingPage({ params }: Props) {
         async function loadQuizData() {
             try {
                 setLoading(true);
-                const res = await api.get(`/quizzes/${quizId}`);
-                const quizData = res.data.data;
+                let res = await api.get(`/quizzes/${quizId}`);
+                let quizData = res.data.data;
+
+                if (quizData?.mode === "exam") {
+                    await api.post(`/quizzes/${quizId}/attempts/start`);
+                    res = await api.get(`/quizzes/${quizId}`);
+                    quizData = res.data.data;
+                }
                 setQuiz(quizData);
 
                 if (quizData && quizData.questions) {
-                    const initialAnswers: Record<number, string | number> = {};
+                    const initialAnswers: Record<number, unknown> = {};
                     quizData.questions.forEach((q: any) => {
                         if (q.user_answer !== null && q.user_answer !== undefined) {
                             initialAnswers[q.id] = q.user_answer;
@@ -120,7 +146,7 @@ export default function QuizDoingPage({ params }: Props) {
                 if (prev <= 1) {
                     clearInterval(interval);
                     showToast("Thời gian làm bài đã hết, đang tự động thu bài...", "warning")
-                    handleAutoSubmitExam("hết_giờ_làm_bài");
+                    handleAutoSubmitExam("timeout");
                     return 0;
                 }
                 return prev - 1;
@@ -136,15 +162,26 @@ export default function QuizDoingPage({ params }: Props) {
 
         const triggerViolation = (reason: string) => {
             if (isSubmittedRef.current) return;
-            setViolations((prev) => {
-                const nextViolations = prev + 1;
-                if (nextViolations >= 3) {
-                    showToast(`PHÁT HIỆN GIAN LẬN QUÁ GIỚI HẠN (3/3)!\nLý do: ${reason}\nHệ thống tự động khóa và nộp bài!`, "danger");                    handleAutoSubmitExam("vi_phạm_quy_chế_quá_3_lần");
-                    return 3;
-                } else {
-                    showToast(`CẢNH BÁO VI PHẠM PHÒNG THI (${nextViolations}/3)!\nHành vi: ${reason}`, "warning");                    return nextViolations;
-                }
-            });
+            const now = Date.now();
+            if (now - lastViolationAtRef.current < 750) return;
+            lastViolationAtRef.current = now;
+
+            const nextViolations = Math.min(violationsRef.current + 1, 3);
+            violationsRef.current = nextViolations;
+            setViolations(nextViolations);
+
+            if (nextViolations >= 3) {
+                showToast(
+                    `Exam submitted after 3 violations.\nReason: ${reason}`,
+                    "danger"
+                );
+                handleAutoSubmitExam("auto_submit");
+            } else {
+                showToast(
+                    `Exam rule violation ${nextViolations}/3\n${reason}`,
+                    "warning"
+                );
+            }
         };
 
         const handleVisibilityChange = () => {
@@ -175,7 +212,7 @@ export default function QuizDoingPage({ params }: Props) {
 
         return () => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
-            window.removeEventListener("blur-sm", handleBlur);
+            window.removeEventListener("blur", handleBlur);
             document.removeEventListener("mouseleave", handleMouseLeave);
             window.removeEventListener("resize", handleResize);
         };
@@ -211,7 +248,7 @@ export default function QuizDoingPage({ params }: Props) {
                 const next = prev + 1;
                 if (next >= 15) {
                     clearInterval(timer);
-                    showToast("Đã ngắt mạng quá 15 giây liên tục! Đang thực hiện nộp bài khẩn cấp.", "danger");                    handleAutoSubmitExam("mất_kết_nối_mạng_quá_15s");
+                    showToast("Đã ngắt mạng quá 15 giây liên tục! Đang thực hiện nộp bài khẩn cấp.", "danger");                    handleAutoSubmitExam("auto_submit");
                     return 15;
                 }
                 return next;
@@ -234,21 +271,27 @@ export default function QuizDoingPage({ params }: Props) {
     }, [quiz, isSubmitted]);
 
     // Hàm thực hiện thu bài nộp tự động khi vi phạm / sập mạng / hết giờ
-    const handleAutoSubmitExam = async (reason: string) => {
+    const handleAutoSubmitExam = async (reason: "timeout" | "auto_submit" | "abandoned") => {
         if (isSubmittedRef.current) return;
+        const currentQuiz = quizRef.current;
+        if (!currentQuiz) return;
+
+        isSubmittedRef.current = true;
         setSubmitting(true);
         try {
-            const currentQuiz = quizRef.current;
-            if (!currentQuiz) return;
-
             const answersPayload = currentQuiz.questions.map((q) => ({
                 question_id: q.id,
                 user_answer: answersRef.current[q.id] !== undefined ? answersRef.current[q.id] : null,
+                mark_status: markedCriticalRef.current[q.id]
+                    ? "critical"
+                    : markedReviewRef.current[q.id]
+                      ? "review"
+                      : null,
             }));
 
             const res = await api.post(`/quizzes/${quizId}/submit`, {
                 answers: answersPayload,
-                submit_reason: `auto_submit_${reason}`,
+                submit_reason: reason,
             });
 
             const result = res.data.data;
@@ -262,8 +305,11 @@ export default function QuizDoingPage({ params }: Props) {
                         ...q,
                         correct_answer: qDetail?.correct_answer,
                         explanations: qDetail?.explanations,
+                        statements: qDetail?.statements,
                         user_answer: qDetail?.user_answer,
                         is_correct: qDetail?.is_correct,
+                        awarded_points: qDetail?.awarded_points,
+                        ai_feedback: qDetail?.ai_feedback,
                     };
                 });
                 return {
@@ -272,9 +318,15 @@ export default function QuizDoingPage({ params }: Props) {
                 };
             });
 
-            showToast(`Đã tự động thu bài thành công!\nĐiểm đạt được: ${result.score}/${result.score_scale}`, "success");            
-            setCurrentIndex(0); // Trở về câu đầu tiên để xem đáp án giải thích
+            if (reason !== "auto_submit") {
+                showToast(
+                    `Exam submitted successfully.\nScore: ${result.score}/${result.score_scale}`,
+                    "success"
+                );
+            }
+            router.replace(`/notebooks/${currentQuiz.notebook_id}?tab=quizzes&quizId=${quizId}`);
         } catch (err) {
+            isSubmittedRef.current = false;
             console.error("Lỗi khi tự động nộp bài:", err);
         } finally {
             setSubmitting(false);
@@ -283,11 +335,13 @@ export default function QuizDoingPage({ params }: Props) {
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#eef6ff]">
+            <div className="flex min-h-full items-center justify-center bg-background">
                 <div className="flex flex-col items-center gap-3">
-                    <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                    <div className="text-sm font-semibold text-purple-600 animate-pulse">
-                        Đang đồng bộ hóa phòng kiểm tra...
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Icon name="progress_activity" className="animate-spin text-2xl" />
+                    </span>
+                    <div className="text-sm font-medium text-muted-foreground">
+                        Preparing your exam room...
                     </div>
                 </div>
             </div>
@@ -304,10 +358,7 @@ export default function QuizDoingPage({ params }: Props) {
 
     const correctCount = quiz.questions.filter((q) => q.is_correct).length;
     const earnedPoints = quiz.questions.reduce((sum, q) => {
-        if (q.is_correct) {
-            return sum + (q.points ?? 0);
-        }
-        return sum;
+        return sum + (q.awarded_points ?? (q.is_correct ? q.points ?? 0 : 0));
     }, 0);
 
     const showCorrectAnswers = quiz.mode === "study" || isSubmitted;
@@ -317,7 +368,7 @@ export default function QuizDoingPage({ params }: Props) {
         : Math.round((answeredCount / totalCount) * 100);
 
     // Sự kiện xử lý bấm chọn đáp án
-    const handleAnswerQuestion = async (questionId: number, optionId: string | number) => {
+    const handleAnswerQuestion = async (questionId: number, optionId: unknown) => {
         const nextAnswers = {
             ...answers,
             [questionId]: optionId,
@@ -345,7 +396,10 @@ export default function QuizDoingPage({ params }: Props) {
                                     user_answer: optionId,
                                     correct_answer: result.correct_answer,
                                     explanations: result.explanations,
+                                    statements: result.statements,
                                     is_correct: result.is_correct,
+                                    awarded_points: result.awarded_points,
+                                    ai_feedback: result.ai_feedback,
                                 }
                                 : q
                         ),
@@ -373,6 +427,7 @@ export default function QuizDoingPage({ params }: Props) {
             setAnswers({});
             setExamResult(null);
             setViolations(0);
+            violationsRef.current = 0;
             setCurrentIndex(0);
             setMarkedReview({});
             setMarkedCritical({});
@@ -400,22 +455,30 @@ export default function QuizDoingPage({ params }: Props) {
 
     // Nộp bài thi thủ công (Exam Mode)
     const doSubmitExam = async () => {
+        if (isSubmittedRef.current) return;
+
         const unanswered = quiz.questions.filter((q) => answers[q.id] === undefined).length;
         let confirmMsg = "Bạn có chắc muốn nộp bài thi ngay?";
         if (unanswered > 0) {
             confirmMsg = `Cảnh báo: Bạn còn ${unanswered} câu chưa chọn đáp án. Bạn vẫn muốn nộp bài chứ?`;
         }
        
+        isSubmittedRef.current = true;
         try {
             setSubmitting(true);
             const answersPayload = quiz.questions.map((q) => ({
                 question_id: q.id,
                 user_answer: answers[q.id] !== undefined ? answers[q.id] : null,
+                mark_status: markedCritical[q.id]
+                    ? "critical"
+                    : markedReview[q.id]
+                      ? "review"
+                      : null,
             }));
 
             const res = await api.post(`/quizzes/${quizId}/submit`, {
                 answers: answersPayload,
-                submit_reason: "user_click",
+                submit_reason: "manual",
             });
 
             const result = res.data.data;
@@ -431,16 +494,19 @@ export default function QuizDoingPage({ params }: Props) {
                             ...q,
                             correct_answer: qDetail?.correct_answer,
                             explanations: qDetail?.explanations,
+                            statements: qDetail?.statements,
                             user_answer: qDetail?.user_answer,
                             is_correct: qDetail?.is_correct,
+                            awarded_points: qDetail?.awarded_points,
+                            ai_feedback: qDetail?.ai_feedback,
                         };
                     }),
                 };
             });
             
-            // Đưa người dùng về câu số 1 để xem lại chi tiết lỗi sai
-            setCurrentIndex(0);
+            router.replace(`/notebooks/${quiz.notebook_id}?tab=quizzes&quizId=${quizId}`);
         } catch (err) {
+            isSubmittedRef.current = false;
             console.error("Lỗi khi nộp bài:", err);
             showToast("Nộp bài thi thất bại. Vui lòng thử lại.", "danger");
         } finally {
@@ -452,75 +518,88 @@ export default function QuizDoingPage({ params }: Props) {
     const currentQuestion = quiz.questions[currentIndex];
     const unansweredCount = quiz.questions.filter((q) => answers[q.id] === undefined).length;
     const submitArmedLabel = unansweredCount > 0 
-        ? `Còn ${unansweredCount} câu chưa làm! Bấm lần nữa để nộp` 
-        : "Bấm lần nữa để xác nhận nộp";
+        ? `${unansweredCount} unanswered. Click again to submit`
+        : "Click again to confirm submission";
 
     return (
-        <div className="min-h-screen w-full relative bg-[#f1f6fc] pb-20 overflow-x-hidden">
+        <div className="relative min-h-full w-full overflow-x-hidden bg-background pb-16">
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             {/* Overlay phong tỏa khi mất mạng kéo dài */}
             {!isOnline && quiz.mode === "exam" && !isSubmitted && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex flex-col items-center justify-center text-white px-4">
-                    <div className="w-14 h-14 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <h2 className="text-xl font-bold text-red-500 mb-2">ĐÃ MẤT KẾT NỐI INTERNET</h2>
-                    <p className="text-sm text-gray-300 text-center max-w-md">
-                        Đang đồng bộ mạng... Hệ thống phòng thi an toàn sẽ tự động nộp bài nếu mất mạng liên tục: <span className="font-extrabold text-red-400">{offlineSeconds} / 15 giây</span>.
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-foreground/90 px-4 text-background backdrop-blur-md">
+                    <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                        <Icon name="wifi_off" className="text-3xl" />
+                    </span>
+                    <h2 className="font-heading text-xl font-semibold">Connection interrupted</h2>
+                    <p className="mt-2 max-w-md text-center text-sm leading-6 text-background/70">
+                        Reconnecting now. The exam will be submitted automatically after <span className="font-semibold text-background">{offlineSeconds} / 15 seconds</span> offline.
                     </p>
                 </div>
             )}
 
-            <div className="relative max-w-6xl mx-auto px-4 pt-8 z-10">
+            <div className="relative z-10 mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
                 
                 {/* TIÊU ĐỀ PHÒNG THI / PHÒNG HỌC */}
-                <div className="bg-white/95 backdrop-blur-md border border-purple-100 rounded-2xl p-6 shadow-xs mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2.5 shadow-xs ${
-                            quiz.mode === "exam" 
-                                ? "bg-purple-100 text-purple-800 border border-purple-200" 
-                                : "bg-blue-100 text-blue-800 border border-blue-200"
-                        }`}>
-                            {quiz.mode === "exam" ? "Hệ Thống Phòng Thi Độc Lập (Exam Mode)" : "Phòng Tự Học Ôn Tập (Study Mode)"}
-                        </span>
-                        <h1 className="text-xl font-bold text-gray-900 leading-snug">{quiz.title}</h1>
+                <header className="mb-6 flex flex-col justify-between gap-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs sm:p-6 md:flex-row md:items-center">
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent">
+                                <Icon name="assignment" className="text-sm" />
+                                Exam mode
+                            </span>
+                            {!isSubmitted && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowExamRules(true)}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                                >
+                                    <Icon name="shield_lock" className="text-sm text-primary" />
+                                    Focused session
+                                </button>
+                            )}
+                        </div>
+                        <h1 className="mt-3 break-words pb-0.5 font-heading text-xl font-semibold leading-[1.35] text-foreground sm:text-2xl">
+                            {quiz.title}
+                        </h1>
                     </div>
                     
                     {isSubmitted ? (
                         <button
                             onClick={() => router.push("/quizzes")}
-                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-xs"
+                            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive active:bg-destructive/20"
                         >
-                            Rời khỏi
+                            Leave exam
                         </button>
                     ) : (
                         <ConfirmButton
-                            idleLabel="Rời khỏi"
-                            armedLabel="Bấm lần nữa để rời (mất tiến trình)"
-                            onConfirm={() => router.push("/quizzes")}
-                            className="px-4 py-2 bg-white hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl transition-all shadow-xs"
-                            armedClassName="px-4 py-2 bg-red-600 text-white border border-red-600 text-sm font-medium rounded-xl shadow-md"
+                            idleLabel="Leave exam"
+                            armedLabel="Click again to submit & leave"
+                            onConfirm={() => handleAutoSubmitExam("abandoned")}
+                            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive active:bg-destructive/20"
+                            armedClassName="inline-flex h-9 items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
                         />
                     )}
-                </div>
+                </header>
 
                 {/* HIỂN THỊ KẾT QUẢ SAU KHI HOÀN THÀNH (STUDY MODE) */}
                 {quiz.mode === "study" && isStudyCompleted && (
-                    <div className="bg-linear-to-r from-emerald-500 to-teal-600 border border-emerald-400 rounded-2xl p-6 shadow-md text-white mb-6">
-                        <h2 className="text-lg font-bold mb-2">Bạn đã hoàn thành bài ôn tập!</h2>
+                    <div className="mb-6 rounded-xl border border-primary/20 bg-primary/10 p-6 text-foreground shadow-xs">
+                        <h2 className="font-heading text-lg font-semibold">Study session completed</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs">Điểm đạt được</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Score</p>
                                 <p className="text-2xl font-black">{earnedPoints}/{quiz.target_total_points}</p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs">Tỷ lệ hoàn thành</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Accuracy</p>
                                 <p className="text-2xl font-black">{progressPercentage}%</p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs">Số câu đúng</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Correct</p>
                                 <p className="text-2xl font-black">{correctCount}/{totalCount}</p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center flex items-center justify-center">
-                                <span className="px-3 py-1 bg-white text-emerald-700 font-bold rounded-lg text-xs">HOÀN THÀNH</span>
+                            <div className="flex items-center justify-center rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Completed</span>
                             </div>
                         </div>
                     </div>
@@ -528,26 +607,28 @@ export default function QuizDoingPage({ params }: Props) {
 
                 {/* HIỂN THỊ KẾT QUẢ KHI NỘP THÀNH CÔNG (EXAM MODE) */}
                 {quiz.mode === "exam" && isSubmitted && examResult && (
-                    <div className="bg-linear-to-r from-purple-600 to-indigo-600 border border-purple-400 rounded-2xl p-6 shadow-md text-white mb-6">
-                        <h2 className="text-lg font-bold mb-1">Báo cáo kết quả bài kiểm tra chính thức</h2>
-                        <p className="text-xs text-purple-100 mb-4">Hồ sơ điểm thi đã được tự động lưu trữ trên cơ sở dữ liệu hệ thống.</p>
+                    <div className="mb-6 rounded-xl border border-primary/20 bg-primary/10 p-6 text-foreground shadow-xs">
+                        <h2 className="font-heading text-lg font-semibold">Exam submitted</h2>
+                        <p className="mb-4 mt-1 text-xs text-muted-foreground">Your result has been saved successfully.</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs text-purple-200">Tổng điểm đạt</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Score</p>
                                 <p className="text-2xl font-black">{examResult.score} / {examResult.score_scale}</p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs text-purple-200">Tỷ lệ chính xác</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Accuracy</p>
                                 <p className="text-2xl font-black">
                                     {examResult.total_questions > 0 ? Math.round((examResult.correct_answers_count / examResult.total_questions) * 100) : 0}%
                                 </p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center">
-                                <p className="text-xs text-purple-200">Số câu đúng</p>
+                            <div className="rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <p className="text-xs text-muted-foreground">Correct</p>
                                 <p className="text-2xl font-black">{examResult.correct_answers_count} / {examResult.total_questions}</p>
                             </div>
-                            <div className="bg-white/10 rounded-xl p-3 text-center flex items-center justify-center">
-                                <span className="px-3 py-1 bg-white text-purple-700 font-bold rounded-lg text-xs">ĐÃ NỘP BÀI</span>
+                            <div className="flex items-center justify-center rounded-[10px] border border-border/70 bg-card p-3 text-center">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                                    <Icon name="check_circle" className="text-sm" /> Submitted
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -559,54 +640,65 @@ export default function QuizDoingPage({ params }: Props) {
                     /* ============================================== */
                     /* GIAO DIỆN PHÒNG THI CHUYÊN NGHIỆP (EXAM MODE)  */
                     /* ============================================== */
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+                    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
                         
                         {/* CỘT LÀM BÀI: MỖI CÂU HIỂN THỊ 1 TRANG */}
-                        <div className="lg:col-span-3 space-y-6">
+                        <div className="order-last min-w-0 space-y-4 lg:order-none">
                             {currentQuestion && (
                                 <>
-                                    <ExamQuestionCard
+                                    <QuizQuestionCard
                                         index={currentIndex}
                                         questionId={currentQuestion.id}
                                         questionText={currentQuestion.question_text}
+                                        questionType={currentQuestion.question_type}
                                         options={currentQuestion.options}
+                                        statements={currentQuestion.statements}
                                         correctAnswer={currentQuestion.correct_answer}
                                         explanations={currentQuestion.explanations}
                                         selectedOptionId={answers[currentQuestion.id]}
                                         onSelectOption={(optId) => handleAnswerQuestion(currentQuestion.id, optId)}
-                                        isSubmitted={isSubmitted}
+                                        onChangeAnswer={
+                                            ["fill_blank", "short_answer", "essay"].includes(currentQuestion.question_type)
+                                                ? (answer) => setAnswers((current) => ({ ...current, [currentQuestion.id]: answer }))
+                                                : undefined
+                                        }
+                                        mode="exam"
                                         points={currentQuestion.points}
-                                        hint={currentQuestion.hint}
+                                        awardedPoints={currentQuestion.awarded_points}
+                                        isCorrect={currentQuestion.is_correct}
+                                        aiFeedback={currentQuestion.ai_feedback}
+                                        allowAnswerChanges
+                                        readOnly={isSubmitted}
                                     />
 
                                     {/* PHÍM ĐIỀU HƯỚNG DƯỚI CÂU HỎI */}
-                                    <div className="bg-white/95 backdrop-blur-xs border border-purple-100 p-4 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-xs">
                                         <div className="flex gap-2">
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="outline"
                                                 disabled={currentIndex === 0}
                                                 onClick={() => setCurrentIndex((p) => p - 1)}
-                                                className="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                                                className="text-xs"
                                             >
-                                                ← Câu trước
-                                            </button>
+                                                <Icon name="arrow_back" className="text-base" />
+                                                Previous
+                                            </Button>
                                             
                                             {currentIndex < quiz.questions.length - 1 ? (
-                                                <button
-                                                    type="button"
+                                                <Button
                                                     onClick={() => setCurrentIndex((p) => p + 1)}
-                                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                                                 >
-                                                    Câu tiếp theo →
-                                                </button>
+                                                    Next
+                                                    <Icon name="arrow_forward" className="text-base" />
+                                                </Button>
                                             ) : (
                                                 !isSubmitted && (
                                                     <ConfirmButton
-                                                        idleLabel="Nộp bài thi"
+                                                        idleLabel="Submit exam"
                                                         armedLabel={submitArmedLabel}
                                                         onConfirm={doSubmitExam}
-                                                        className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 text-white rounded-xl text-xs font-bold shadow-md transition"
-                                                        armedClassName="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md transition"
+                                                        className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-[var(--primary-hover)]"
+                                                        armedClassName="inline-flex h-9 items-center justify-center rounded-md bg-accent px-3 text-sm font-medium text-accent-foreground transition-colors"
                                                     />
                                                 )
                                             )}
@@ -615,30 +707,52 @@ export default function QuizDoingPage({ params }: Props) {
                                         {/* Cờ đánh dấu câu hỏi đặc biệt */}
                                         {!isSubmitted && (
                                             <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setMarkedReview(p => ({ ...p, [currentQuestion.id]: !p[currentQuestion.id] }))}
-                                                    className={`px-3 py-2 border rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const nextValue = !markedReview[currentQuestion.id];
+                                                        setMarkedReview((current) => ({
+                                                            ...current,
+                                                            [currentQuestion.id]: nextValue,
+                                                        }));
+                                                        if (nextValue) {
+                                                            setMarkedCritical((current) => ({
+                                                                ...current,
+                                                                [currentQuestion.id]: false,
+                                                            }));
+                                                        }
+                                                    }}
+                                                    className={`text-xs ${
                                                         markedReview[currentQuestion.id]
-                                                            ? "bg-amber-100 border-amber-300 text-amber-800"
-                                                            : "bg-white border-gray-200 text-gray-500 hover:bg-amber-50"
+                                                            ? "border-chart-1/30 bg-chart-1/10 text-chart-1 hover:bg-chart-1/15"
+                                                            : ""
                                                     }`}
                                                 >
-                                                    <span>🚩</span>
-                                                    <span>{markedReview[currentQuestion.id] ? "Gỡ cờ" : "Cần xem lại"}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setMarkedCritical(p => ({ ...p, [currentQuestion.id]: !p[currentQuestion.id] }))}
-                                                    className={`px-3 py-2 border rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                                                        markedCritical[currentQuestion.id]
-                                                            ? "bg-red-100 border-red-300 text-red-800"
-                                                            : "bg-white border-gray-200 text-gray-500 hover:bg-red-50"
-                                                    }`}
+                                                    <Icon name="flag" className="text-base" />
+                                                    <span>{markedReview[currentQuestion.id] ? "Unmark review" : "Mark for review"}</span>
+                                                </Button>
+                                                <Button
+                                                    variant={markedCritical[currentQuestion.id] ? "destructive" : "outline"}
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const nextValue = !markedCritical[currentQuestion.id];
+                                                        setMarkedCritical((current) => ({
+                                                            ...current,
+                                                            [currentQuestion.id]: nextValue,
+                                                        }));
+                                                        if (nextValue) {
+                                                            setMarkedReview((current) => ({
+                                                                ...current,
+                                                                [currentQuestion.id]: false,
+                                                            }));
+                                                        }
+                                                    }}
+                                                    className="text-xs"
                                                 >
-                                                    <span>⚠️</span>
-                                                    <span>{markedCritical[currentQuestion.id] ? "Gỡ quan trọng" : "Nghi ngờ sai"}</span>
-                                                </button>
+                                                    <Icon name="priority_high" className="text-base" />
+                                                    <span>{markedCritical[currentQuestion.id] ? "Unmark critical" : "Mark critical"}</span>
+                                                </Button>
                                             </div>
                                         )}
                                     </div>
@@ -647,7 +761,7 @@ export default function QuizDoingPage({ params }: Props) {
                         </div>
 
                         {/* CỘT PHẢI: COMPONENT ĐIỀU HƯỚNG TÁCH BIỆT */}
-                        <div className="lg:col-span-1 lg:sticky lg:top-6">
+                        <div className="order-first lg:order-none lg:sticky lg:top-6">
                             <ExamSidebar
                                 questions={quiz.questions}
                                 answers={answers}
@@ -679,43 +793,54 @@ export default function QuizDoingPage({ params }: Props) {
                                     index={idx}
                                     questionId={q.id}
                                     questionText={q.question_text}
+                                    questionType={q.question_type}
                                     options={q.options}
+                                    statements={q.statements}
                                     correctAnswer={q.correct_answer}
                                     explanations={q.explanations}
-                                    selectedOptionId={answers[q.id] !== undefined ? (answers[q.id] as number) : q.user_answer} 
+                                    selectedOptionId={answers[q.id] !== undefined ? answers[q.id] : q.user_answer}
                                     onSelectOption={(optionId) => handleAnswerQuestion(q.id, optionId)}
+                                    onChangeAnswer={
+                                        quiz.mode === "study" && ["multiple_response", "true_false"].includes(q.question_type)
+                                            ? (answer) => setAnswers((current) => ({ ...current, [q.id]: answer }))
+                                            : undefined
+                                    }
                                     mode={quiz.mode}
+                                    awardedPoints={q.awarded_points}
+                                    isCorrect={q.is_correct}
+                                    aiFeedback={q.ai_feedback}
+                                    allowAnswerChanges={["multiple_response", "true_false"].includes(q.question_type)}
                                 />
                             ))}
                         </div>
 
                         {/* THANH TIẾN ĐỘ CHẾ ĐỘ HỌC */}
-                        <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-5 shadow-xs mt-8 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                <span>{showCorrectAnswers ? "Kết quả chính xác đạt được" : "Tiến độ làm bài"}</span>
-                                <span className="text-blue-600 font-extrabold">
+                        <div className="mt-8 space-y-2.5 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+                            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                                <span>{showCorrectAnswers ? "Current result" : "Answer progress"}</span>
+                                <span className="font-medium text-primary">
                                     {showCorrectAnswers
-                                        ? `${earnedPoints}/${quiz.target_total_points} điểm (${progressPercentage}%)`
-                                        : `${answeredCount}/${totalCount} câu (${progressPercentage}%)`
+                                        ? `${earnedPoints}/${quiz.target_total_points} points (${progressPercentage}%)`
+                                        : `${answeredCount}/${totalCount} questions (${progressPercentage}%)`
                                     }
                                 </span>
                             </div>
-                            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                 <div 
-                                    className="h-full rounded-full transition-all duration-300 ease-out bg-blue-600"
+                                    className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
                                     style={{ width: `${progressPercentage}%` }}
                                 />
                             </div>
                         </div>
 
                         {/* CHÂN TRANG ĐIỀU KHIỂN CHẾ ĐỘ STUDY */}
-                        <div className="mt-10 pt-6 border-t border-gray-200/60 flex justify-end gap-4">
+                        <div className="mt-10 flex justify-end gap-4 border-t border-border/70 pt-6">
                             <ConfirmButton
-                                idleLabel="Làm lại từ đầu"
-                                armedLabel="Bấm lần nữa để xóa hết & làm lại"
+                                idleLabel="Start over"
+                                armedLabel="Click again to reset progress"
                                 onConfirm={doResetQuiz}
-                                className="px-6 py-3 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-sm transition-all shadow-xs"
-                                armedClassName="px-6 py-3 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-sm transition-all shadow-xs"
+                                className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                armedClassName="inline-flex h-9 items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
                             />
                         </div>
 
@@ -723,6 +848,30 @@ export default function QuizDoingPage({ params }: Props) {
                 )}
 
             </div>
+
+            <Dialog open={showExamRules} onOpenChange={setShowExamRules}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-lg">
+                            <Icon name="shield_lock" className="text-xl text-primary" />
+                            Exam rules
+                        </DialogTitle>
+                        <DialogDescription className="leading-5">
+                            Stay focused in this exam window until you submit.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm text-foreground">
+                        <p className="flex items-start gap-2.5">
+                            <Icon name="tab_inactive" className="mt-0.5 text-base text-accent" />
+                            Do not switch tabs, leave the exam, or use split-screen mode.
+                        </p>
+                        <p className="flex items-start gap-2.5">
+                            <Icon name="warning" className="mt-0.5 text-base text-destructive" />
+                            The exam is submitted automatically after three violations.
+                        </p>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

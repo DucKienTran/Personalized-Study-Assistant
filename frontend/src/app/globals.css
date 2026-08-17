@@ -11,7 +11,7 @@
 @theme inline {
   /* Fonts */
   --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading);
 
   /* Core colors */
   --color-background: var(--background);
@@ -55,7 +55,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Charts */
+  /* Charts — reused as the notebook tag-color set (left-border accents) */
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -72,60 +72,60 @@
 }
 
 /* ==========================================================
-   Design Tokens (Light)
+   Design Tokens (Light) — "warm academic" palette
    ========================================================== */
 
 :root {
-  /* Brand */
+  /* Brand — deep olive/forest green (darker & warmer than the old emerald) */
 
-  --primary: #1e6e4b;
-  --primary-hover: #185a3d;
-  --primary-active: #124430;
-  --primary-tint: #e7f3ec;
+  --primary: #46583a;
+  --primary-hover: #39482f;
+  --primary-active: #2c3924;
+  --primary-tint: #eaeee3;
   --primary-foreground: #ffffff;
 
-  /* Surface */
+  /* Surface — warm cream, not cool gray */
 
-  --background: #f6f8f6;
-  --foreground: #16241c;
+  --background: #f7f5f0;
+  --foreground: #241f16;
 
   --card: #ffffff;
-  --card-foreground: #16241c;
+  --card-foreground: #241f16;
 
   --popover: #ffffff;
-  --popover-foreground: #16241c;
+  --popover-foreground: #241f16;
 
   /* Secondary */
 
-  --secondary: #eef3ef;
-  --secondary-foreground: #16241c;
+  --secondary: #efece4;
+  --secondary-foreground: #241f16;
 
-  --muted: #eef3ef;
-  --muted-foreground: #5b6e62;
+  --muted: #efece4;
+  --muted-foreground: #6b6355;
 
-  /* Accent */
+  /* Accent — warm terracotta/ochre, for badges & the odd highlight (not the primary CTA color) */
 
-  --accent: #c9772e;
+  --accent: #b5762f;
   --accent-foreground: #ffffff;
 
   /* Semantic */
 
-  --destructive: #dc2626;
+  --destructive: #c0392b;
 
   /* Inputs */
 
-  --border: #e2e9e4;
-  --input: #e2e9e4;
-  --ring: #1e6e4b;
+  --border: #e6e1d5;
+  --input: #e6e1d5;
+  --ring: #46583a;
 
-  /* Radius */
+  /* Radius — soft, book-like corners */
 
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
   /* Sidebar */
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #16241c;
+  --sidebar-foreground: #241f16;
 
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: #ffffff;
@@ -136,17 +136,17 @@
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
-  /* Charts */
+  /* Charts — doubles as the notebook tag-color palette (card left-border / top-border accents) */
 
-  --chart-1: #1e6e4b;
-  --chart-2: #3b7a52;
-  --chart-3: #6d987d;
-  --chart-4: #97b8a3;
-  --chart-5: #c9ddd0;
+  --chart-1: #4a6fa5; /* blue   — e.g. Psychology */
+  --chart-2: #5c8a5a; /* green  — e.g. Chemistry */
+  --chart-3: #c08a3e; /* ochre  — e.g. History */
+  --chart-4: #8a6f4a; /* brown  — e.g. Math */
+  --chart-5: #a05a4a; /* rust, spare 5th tag color */
 
   /* Utilities */
 
-  --primary-shadow: rgb(30 110 75 / 0.15);
+  --primary-shadow: rgb(70 88 58 / 0.15);
 }
 
 /* ==========================================================
@@ -154,55 +154,55 @@
    ========================================================== */
 
 .dark {
-  --background: #101714;
-  --foreground: #edf4ef;
+  --background: #16140f;
+  --foreground: #f3efe4;
 
-  --card: #18231d;
-  --card-foreground: #edf4ef;
+  --card: #201d16;
+  --card-foreground: #f3efe4;
 
-  --popover: #18231d;
-  --popover-foreground: #edf4ef;
+  --popover: #201d16;
+  --popover-foreground: #f3efe4;
 
-  --primary: #5ca980;
-  --primary-hover: #71b68f;
-  --primary-active: #4c946f;
-  --primary-tint: rgb(92 169 128 / 0.15);
-  --primary-foreground: #08100c;
+  --primary: #8ba377;
+  --primary-hover: #9db28c;
+  --primary-active: #79936a;
+  --primary-tint: rgb(139 163 119 / 0.15);
+  --primary-foreground: #10130c;
 
-  --secondary: #223128;
-  --secondary-foreground: #edf4ef;
+  --secondary: #2a271e;
+  --secondary-foreground: #f3efe4;
 
-  --muted: #223128;
-  --muted-foreground: #9eb4a7;
+  --muted: #2a271e;
+  --muted-foreground: #b3a996;
 
-  --accent: #d7924d;
-  --accent-foreground: #08100c;
+  --accent: #d99a52;
+  --accent-foreground: #10130c;
 
-  --destructive: #ef4444;
+  --destructive: #e0564a;
 
-  --border: #2a3930;
-  --input: #2a3930;
-  --ring: #5ca980;
+  --border: #332f24;
+  --input: #332f24;
+  --ring: #8ba377;
 
-  --sidebar: #18231d;
-  --sidebar-foreground: #edf4ef;
+  --sidebar: #201d16;
+  --sidebar-foreground: #f3efe4;
 
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
 
-  --sidebar-accent: #223128;
+  --sidebar-accent: #2a271e;
   --sidebar-accent-foreground: var(--primary);
 
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
-  --chart-1: #5ca980;
-  --chart-2: #77bf97;
-  --chart-3: #9fd1b4;
-  --chart-4: #bddfc8;
-  --chart-5: #dbeee2;
+  --chart-1: #7fa0d4;
+  --chart-2: #8bc189;
+  --chart-3: #dcb06f;
+  --chart-4: #b79b74;
+  --chart-5: #c2857a;
 
-  --primary-shadow: rgb(92 169 128 / 0.2);
+  --primary-shadow: rgb(139 163 119 / 0.2);
 }
 
 /* ==========================================================
@@ -228,7 +228,34 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
+    @apply font-heading;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+}
+
+/* ==========================================================
+   Icons — Material Symbols, standardized to the thin outline
+   style used across the reference app (weight 300, no fill)
+   ========================================================== */
+
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 300,
+    "GRAD" 0,
+    "opsz" 24;
 }
 
 /* ==========================================================
@@ -258,4 +285,143 @@
 .thinking-char {
   display: inline-block;
   animation: thinking-wave 1.2s ease-in-out infinite;
+}
+
+.notebook-sidebar-scroll {
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.notebook-sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notebook-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.notebook-sidebar-scroll::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  transition: background-color 150ms ease;
+}
+
+.notebook-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+}
+
+.notebook-sidebar-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================
+   Dashboard scrolling
+   Mobile/tablet: normal page scrolling
+   Desktop: section snap experience
+   ========================================================== */
+
+.dashboard-scroll {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
+.dashboard-scroll.dashboard-inertia-active {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
+.dashboard-snap-section {
+  scroll-snap-align: none;
+  scroll-snap-stop: normal;
+}
+
+/* Desktop-only dashboard snap */
+@media (min-width: 1024px) {
+  .dashboard-scroll {
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
+  }
+
+  .dashboard-scroll.dashboard-inertia-active {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+
+  .dashboard-snap-section {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
+
+@keyframes dashboard-section-settle {
+  from {
+    opacity: 0.58;
+    transform: translateY(28px) scale(0.988);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Settle animation is desktop-only too */
+@media (min-width: 1024px) {
+  @supports (animation-timeline: view()) {
+    .dashboard-section-content {
+      animation: dashboard-section-settle linear both;
+      animation-timeline: view(block);
+      animation-range: entry 0% cover 48%;
+      transform-origin: 50% 35%;
+      will-change: opacity, transform;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-scroll {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+
+  .dashboard-section-content {
+    animation: none;
+    transform: none;
+  }
+}
+
+.notebook-grid-fixed {
+  grid-template-rows: repeat(var(--notebook-rows-mobile), minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .notebook-grid-fixed {
+    grid-template-rows: repeat(var(--notebook-rows-desktop), minmax(0, 1fr));
+  }
+}
+
+.react-pdf__Page__textContent .pdf-citation-highlight {
+  position: relative;
+  z-index: 3;
+  display: inline;
+  border-radius: 0.125rem;
+  background-color: rgb(253 224 71 / 0.72) !important;
+  color: transparent !important;
+  box-shadow: inset 0 -0.14em 0 rgb(234 179 8 / 0.8);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }

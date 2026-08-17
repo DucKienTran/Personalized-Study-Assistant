@@ -5,12 +5,11 @@ import Link from "next/link";
 
 import { authService } from "@/services/auth.service";
 
-import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
 
 import { UserRegister } from "@/types";
 
-import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 import {
   MailIcon,
@@ -32,6 +31,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ValidationErrorItem {
   loc?: (string | number)[];
@@ -137,17 +137,14 @@ export default function RegisterPage() {
 
   if (isSuccess) {
     return (
-      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
-        <AuthBackgroundPattern />
-
-        <div className="relative z-10 w-full max-w-md">
-          <Card className="border-border bg-card/95 shadow-sm text-center">
+      <AuthShell>
+          <Card className="border border-border bg-card text-center shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
             <CardHeader className="space-y-3">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <CheckCircleIcon size={32} />
               </div>
 
-              <CardTitle className="text-2xl font-bold text-foreground text-balance">
+              <CardTitle className="font-heading text-3xl font-medium text-foreground text-balance">
                 Check your email
               </CardTitle>
 
@@ -159,7 +156,7 @@ export default function RegisterPage() {
             </CardHeader>
 
             <CardContent>
-              <div className="rounded-xl border border-border bg-muted p-4 text-left">
+              <div className="rounded-lg border border-border bg-muted/60 p-4 text-left">
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   If this email is awaiting verification, a new verification
                   email has been sent.
@@ -173,7 +170,7 @@ export default function RegisterPage() {
 
               <Button
                 size="lg"
-                className="mt-6 h-11 w-full"
+                className="mt-6 h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]"
                 render={<Link href={AUTH_ROUTES.LOGIN} />}
               >
                 Back to login
@@ -188,39 +185,35 @@ export default function RegisterPage() {
               </button>
             </CardContent>
           </Card>
-        </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
-      <AuthBackgroundPattern />
-
-      <div className="relative z-10 w-full max-w-md">
-        <Card className="border-border bg-card/95 shadow-sm backdrop-blur-md transition-shadow duration-200 hover:shadow-md">
-          <CardHeader className="space-y-3 text-center">
-            <CardTitle className="text-balance text-3xl font-bold tracking-tight text-foreground">
-              {APP_CONFIG.NAME}
+    <AuthShell>
+        <Card className="border border-border bg-card shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
+          <CardHeader className="space-y-3 border-b border-border pb-6 text-center sm:text-left">
+            <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
+              Begin a new chapter
+            </p>
+            <CardTitle className="font-heading text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+              Create your account
             </CardTitle>
 
             <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-              Create your account to get started.
+              Set up your learning space in a few moments.
             </CardDescription>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="pt-1">
             {error && (
-              <div
-                role="alert"
-                className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
-              >
-                <WarningIcon size={18} className="mt-0.5 shrink-0" />
-                <span className="leading-relaxed">{error}</span>
-              </div>
+              <Alert variant="destructive" className="mb-6 bg-destructive/5">
+                <WarningIcon size={18} />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="full-name">
                   Full name <span className="font-normal text-muted-foreground">(optional)</span>
@@ -239,7 +232,7 @@ export default function RegisterPage() {
                     placeholder="John Doe"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                   />
                 </div>
               </div>
@@ -260,7 +253,7 @@ export default function RegisterPage() {
                     placeholder="user@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
@@ -282,7 +275,7 @@ export default function RegisterPage() {
                     placeholder="Minimum 8 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
@@ -304,13 +297,13 @@ export default function RegisterPage() {
                     placeholder="Repeat your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
               </div>
 
-              <Button type="submit" size="lg" className="h-11 w-full gap-2" disabled={loading}>
+              <Button type="submit" size="lg" className="h-12 w-full gap-2 rounded-lg hover:bg-[var(--primary-hover)]" disabled={loading}>
                 {loading ? (
                   <>
                     <ProgressActivityIcon size={18} className="animate-spin" />
@@ -336,7 +329,6 @@ export default function RegisterPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 
 import { userService } from "@/services/user.service";
+import { AuthShell } from "@/components/auth/AuthShell";
 import {
   LockIcon,
   WarningIcon,
@@ -21,6 +22,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ApiErrorResponse {
   response?: {
@@ -102,11 +104,13 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-[#F8FAF8] px-4 py-12">
-      <div className="w-full max-w-md">
-        <Card className="border-border bg-card/95 shadow-sm">
-          <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
+    <AuthShell>
+        <Card className="border border-border bg-card shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
+          <CardHeader className="space-y-3 border-b border-border pb-6 text-center sm:text-left">
+            <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
+              Account security
+            </p>
+            <CardTitle className="font-heading text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
               Change password
             </CardTitle>
             <CardDescription className="text-sm leading-relaxed text-muted-foreground">
@@ -114,27 +118,21 @@ export default function ChangePasswordPage() {
             </CardDescription>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="pt-1">
             {isSuccess && (
-              <div
-                role="status"
-                className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary"
-              >
-                <CheckCircleIcon size={18} className="mt-0.5 shrink-0" />
-                <span className="leading-relaxed">
+              <Alert role="status" className="mb-6 border-primary/20 bg-primary/5 text-primary">
+                <CheckCircleIcon size={18} />
+                <AlertDescription className="text-primary">
                   Password changed successfully. Your other sessions have been signed out.
-                </span>
-              </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             {error && (
-              <div
-                role="alert"
-                className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
-              >
-                <WarningIcon size={18} className="mt-0.5 shrink-0" />
-                <span className="leading-relaxed">{error}</span>
-              </div>
+              <Alert variant="destructive" className="mb-6 bg-destructive/5">
+                <WarningIcon size={18} />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -151,7 +149,7 @@ export default function ChangePasswordPage() {
                     autoComplete="current-password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
@@ -171,7 +169,7 @@ export default function ChangePasswordPage() {
                     placeholder="Minimum 8 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
@@ -190,13 +188,13 @@ export default function ChangePasswordPage() {
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-11 pl-10"
+                    className="h-12 rounded-lg bg-background/60 pl-10"
                     required
                   />
                 </div>
               </div>
 
-              <Button type="submit" size="lg" className="h-11 w-full gap-2" disabled={loading}>
+              <Button type="submit" size="lg" className="h-12 w-full gap-2 rounded-lg hover:bg-[var(--primary-hover)]" disabled={loading}>
                 {loading ? (
                   <>
                     <ProgressActivityIcon size={18} className="animate-spin" />
@@ -215,7 +213,6 @@ export default function ChangePasswordPage() {
             </form>
           </CardContent>
         </Card>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

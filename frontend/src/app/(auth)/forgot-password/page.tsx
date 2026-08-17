@@ -4,10 +4,9 @@ import React, { useState } from "react";
 import Link from "next/link";
 
 import { authService } from "@/services/auth.service";
-import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
 
-import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+import { AuthShell } from "@/components/auth/AuthShell";
 import {
   MailIcon,
   WarningIcon,
@@ -26,6 +25,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ApiErrorResponse {
   response?: {
@@ -68,11 +68,8 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
-      <AuthBackgroundPattern />
-
-      <div className="relative z-10 w-full max-w-md">
-        <Card className="border-border bg-card/95 shadow-sm backdrop-blur-md transition-shadow duration-200 hover:shadow-md">
+    <AuthShell>
+        <Card className="border border-border bg-card shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
           {isSuccess ? (
             <>
               <CardHeader className="space-y-3 text-center">
@@ -80,7 +77,7 @@ export default function ForgotPasswordPage() {
                   <CheckCircleIcon size={32} />
                 </div>
 
-                <CardTitle className="text-2xl font-bold text-foreground text-balance">
+                <CardTitle className="font-heading text-3xl font-medium text-foreground text-balance">
                   Check your email
                 </CardTitle>
 
@@ -92,7 +89,7 @@ export default function ForgotPasswordPage() {
               </CardHeader>
 
               <CardContent>
-                <div className="rounded-xl border border-border bg-muted p-4 text-left">
+                <div className="rounded-lg border border-border bg-muted/60 p-4 text-left">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     We&apos;ve sent a password reset link. Open your inbox and
                     follow the link to choose a new password.
@@ -102,7 +99,7 @@ export default function ForgotPasswordPage() {
                 <Button
                   nativeButton={false}
                   size="lg"
-                  className="mt-6 h-11 w-full"
+                  className="mt-6 h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]"
                   render={<Link href={AUTH_ROUTES.LOGIN} />}
                 >
                   Back to login
@@ -119,25 +116,25 @@ export default function ForgotPasswordPage() {
             </>
           ) : (
             <>
-              <CardHeader className="space-y-3 text-center">
-                <CardTitle className="text-balance text-3xl font-bold tracking-tight text-foreground">
-                  {APP_CONFIG.NAME}
+              <CardHeader className="space-y-3 border-b border-border pb-6 text-center sm:text-left">
+                <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
+                  Account recovery
+                </p>
+                <CardTitle className="font-heading text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+                  Reset your password
                 </CardTitle>
 
                 <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                  Enter your email and we&apos;ll send you a reset link.
+                  Enter your email and we&apos;ll send you a secure reset link.
                 </CardDescription>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="pt-1">
                 {error && (
-                  <div
-                    role="alert"
-                    className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
-                  >
-                    <WarningIcon size={18} className="mt-0.5 shrink-0" />
-                    <span className="leading-relaxed">{error}</span>
-                  </div>
+                  <Alert variant="destructive" className="mb-6 bg-destructive/5">
+                    <WarningIcon size={18} />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -157,13 +154,13 @@ export default function ForgotPasswordPage() {
                         placeholder="user@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="h-11 pl-10"
+                        className="h-12 rounded-lg bg-background/60 pl-10"
                         required
                       />
                     </div>
                   </div>
 
-                  <Button type="submit" size="lg" className="h-11 w-full gap-2" disabled={loading}>
+                  <Button type="submit" size="lg" className="h-12 w-full gap-2 rounded-lg hover:bg-[var(--primary-hover)]" disabled={loading}>
                     {loading ? (
                       <>
                         <ProgressActivityIcon size={18} className="animate-spin" />
@@ -191,7 +188,6 @@ export default function ForgotPasswordPage() {
             </>
           )}
         </Card>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

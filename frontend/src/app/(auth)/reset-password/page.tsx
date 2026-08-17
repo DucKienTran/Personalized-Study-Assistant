@@ -5,10 +5,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
-import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
 
-import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+import { AuthShell } from "@/components/auth/AuthShell";
 import {
   LockIcon,
   WarningIcon,
@@ -27,6 +26,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ApiErrorResponse {
   response?: {
@@ -109,12 +109,12 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <Card className="w-full max-w-md border-border bg-card/95 shadow-sm text-center">
+      <Card className="w-full border border-border bg-card text-center shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
         <CardHeader className="space-y-3">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <WarningIcon size={32} />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Invalid link</CardTitle>
+          <CardTitle className="font-heading text-3xl font-medium text-foreground">Invalid link</CardTitle>
           <CardDescription className="text-sm leading-relaxed text-muted-foreground">
             This password reset link is missing or invalid. Request a new one.
           </CardDescription>
@@ -123,7 +123,7 @@ function ResetPasswordForm() {
         <CardContent>
           <Button
             size="lg"
-            className="h-11 w-full"
+            className="h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]"
             render={<Link href={AUTH_ROUTES.FORGOT_PASSWORD} />}
           >
             Request new link
@@ -135,12 +135,12 @@ function ResetPasswordForm() {
 
   if (isSuccess) {
     return (
-      <Card className="w-full max-w-md border-border bg-card/95 shadow-sm text-center">
+      <Card className="w-full border border-border bg-card text-center shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
         <CardHeader className="space-y-3">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
             <CheckCircleIcon size={32} />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Password updated</CardTitle>
+          <CardTitle className="font-heading text-3xl font-medium text-foreground">Password updated</CardTitle>
           <CardDescription className="text-sm leading-relaxed text-muted-foreground">
             Your password has been reset. You can now log in with your new password.
           </CardDescription>
@@ -149,7 +149,7 @@ function ResetPasswordForm() {
         <CardContent>
           <Button
             size="lg"
-            className="h-11 w-full"
+            className="h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]"
             render={<Link href={AUTH_ROUTES.LOGIN} />}
           >
             Go to login
@@ -160,25 +160,25 @@ function ResetPasswordForm() {
   }
 
   return (
-    <Card className="w-full max-w-md border-border bg-card/95 shadow-sm backdrop-blur-md transition-shadow duration-200 hover:shadow-md">
-      <CardHeader className="space-y-3 text-center">
-        <CardTitle className="text-balance text-3xl font-bold tracking-tight text-foreground">
-          {APP_CONFIG.NAME}
+    <Card className="w-full border border-border bg-card shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
+      <CardHeader className="space-y-3 border-b border-border pb-6 text-center sm:text-left">
+        <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
+          Secure your account
+        </p>
+        <CardTitle className="font-heading text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          Choose a new password
         </CardTitle>
         <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-          Choose a new password for your account.
+          Use at least eight characters with a letter and a number.
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="pt-1">
         {error && (
-          <div
-            role="alert"
-            className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
-          >
-            <WarningIcon size={18} className="mt-0.5 shrink-0" />
-            <span className="leading-relaxed">{error}</span>
-          </div>
+          <Alert variant="destructive" className="mb-6 bg-destructive/5">
+            <WarningIcon size={18} />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,7 +196,7 @@ function ResetPasswordForm() {
                 placeholder="Minimum 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11 pl-10"
+                className="h-12 rounded-lg bg-background/60 pl-10"
                 required
               />
             </div>
@@ -216,13 +216,13 @@ function ResetPasswordForm() {
                 placeholder="Repeat your new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-11 pl-10"
+                className="h-12 rounded-lg bg-background/60 pl-10"
                 required
               />
             </div>
           </div>
 
-          <Button type="submit" size="lg" className="h-11 w-full gap-2" disabled={loading}>
+          <Button type="submit" size="lg" className="h-12 w-full gap-2 rounded-lg hover:bg-[var(--primary-hover)]" disabled={loading}>
             {loading ? (
               <>
                 <ProgressActivityIcon size={18} className="animate-spin" />
@@ -243,13 +243,10 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
-      <AuthBackgroundPattern />
-
-      <div className="relative z-10 w-full max-w-md">
+    <AuthShell>
         <Suspense
           fallback={
-            <Card className="w-full max-w-md border-border bg-card/95 shadow-sm p-8 text-center">
+            <Card className="w-full border border-border bg-card p-8 text-center ring-0">
               <ProgressActivityIcon size={32} className="mx-auto animate-spin text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
             </Card>
@@ -257,7 +254,6 @@ export default function ResetPasswordPage() {
         >
           <ResetPasswordForm />
         </Suspense>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

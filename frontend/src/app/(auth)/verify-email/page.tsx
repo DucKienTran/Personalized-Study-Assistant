@@ -5,10 +5,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { authService } from "@/services/auth.service";
-import { APP_CONFIG } from "@/constants/app";
 import { AUTH_ROUTES } from "@/constants/auth";
 
-import { AuthBackgroundPattern } from "@/components/auth/AuthBackgroundPattern";
+import { AuthShell } from "@/components/auth/AuthShell";
 import {
   CheckCircleIcon,
   CancelIcon,
@@ -104,12 +103,15 @@ function VerifyEmailContent() {
   }, [status, router]);
 
   return (
-    <Card className="w-full max-w-md border-border bg-card/95 shadow-sm text-center">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
-          {APP_CONFIG.NAME}
+    <Card className="w-full border border-border bg-card text-center shadow-[0_24px_70px_-38px_var(--primary-shadow)] ring-0">
+      <CardHeader className="space-y-2 border-b border-border pb-6">
+        <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
+          Account verification
+        </p>
+        <CardTitle className="font-heading text-3xl font-medium tracking-tight text-foreground">
+          Verify your email
         </CardTitle>
-        <p className="text-sm text-muted-foreground">Account verification</p>
+        <p className="text-sm text-muted-foreground">Confirming your account securely.</p>
       </CardHeader>
 
       <CardContent>
@@ -129,14 +131,14 @@ function VerifyEmailContent() {
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">Email Verified!</h2>
+              <h2 className="font-heading text-2xl font-medium text-foreground">Email verified</h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 Your account is now active. Redirecting to login in{" "}
                 <span className="font-semibold text-primary">{countdown}s</span>...
               </p>
             </div>
 
-            <Button size="lg" className="h-11 w-full" onClick={() => router.push(AUTH_ROUTES?.LOGIN || "/login")}>
+            <Button size="lg" className="h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]" onClick={() => router.push(AUTH_ROUTES?.LOGIN || "/login")}>
               Go to login now
             </Button>
           </div>
@@ -149,13 +151,13 @@ function VerifyEmailContent() {
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">Verification Failed</h2>
+              <h2 className="font-heading text-2xl font-medium text-foreground">Verification failed</h2>
               <p className="text-sm leading-relaxed text-muted-foreground">{errorMessage}</p>
             </div>
 
             <Button
               size="lg"
-              className="h-11 w-full"
+              className="h-12 w-full rounded-lg hover:bg-[var(--primary-hover)]"
               render={<Link href={AUTH_ROUTES?.LOGIN || "/login"} />}
             >
               Back to login
@@ -169,13 +171,10 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
-      <AuthBackgroundPattern />
-
-      <div className="relative z-10 w-full max-w-md">
+    <AuthShell>
         <Suspense
           fallback={
-            <Card className="w-full max-w-md border-border bg-card/95 shadow-sm p-8 text-center">
+            <Card className="w-full border border-border bg-card p-8 text-center ring-0">
               <ProgressActivityIcon size={32} className="mx-auto animate-spin text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
             </Card>
@@ -183,7 +182,6 @@ export default function VerifyEmailPage() {
         >
           <VerifyEmailContent />
         </Suspense>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

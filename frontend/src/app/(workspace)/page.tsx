@@ -1,112 +1,233 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import * as Icons from "@/components/shared/icons";
-import { WORKSPACE_FEATURES } from "@/constants/workspace";
+
 import { useAuth } from "@/hooks/useAuth";
+import { dashboardService } from "@/services/dashboard.service";
+import { notebookService } from "@/services/notebook.service";
+import { DashboardStatsOut } from "@/types/dashboard";
+import { NotebookOut } from "@/types/notebook";
+import { Skeleton } from "@/components/ui/skeleton";
+import { NotebookCard } from "@/components/notebooks/NotebookCard";
+import { StatCards } from "@/components/dashboard/StatCards";
+import { CreateNotebookModal } from "@/components/notebooks/CreateNotebookModal";
+import { DeleteNotebookDialog } from "@/components/notebooks/DeleteNotebookDialog";
+import { LibraryIcon, AddIcon } from "@/components/shared/icons";
 
-// --- SKELETON ---
-const WorkspaceSkeleton = () => (
-    <div className="max-w-5xl mx-auto space-y-8 pt-4 w-full">
-        <div className="space-y-3">
-            <div className="h-7 bg-gray-200 rounded-md w-48 animate-pulse"></div>
-            <div className="h-4 bg-gray-100 rounded-md w-64 animate-pulse"></div>
-        </div>
+export default function Homepage() {
+  const { currentUser, loading: authLoading } = useAuth();
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((item) => (
-                <div
-                    key={item}
-                    className="bg-white border border-gray-100 rounded-2xl p-5 h-[200px]"
-                >
-                    <div className="w-10 h-10 bg-gray-100 rounded-xl mb-4 animate-pulse"></div>
-                    <div className="h-5 bg-gray-200 rounded-md w-3/4 mb-3 animate-pulse"></div>
-                    <div className="h-3 bg-gray-100 rounded-md w-full mt-2 animate-pulse"></div>
-                </div>
-            ))}
-        </div>
-    </div>
-);
+  const [stats, setStats] = useState<DashboardStatsOut | null>(null);
+  const [notebooks, setNotebooks] = useState<NotebookOut[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingNotebook, setEditingNotebook] = useState<NotebookOut | null>(null);
+  const [deletingNotebook, setDeletingNotebook] = useState<NotebookOut | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-const renderFeatureIcon = (iconId: string) => {
-    switch (iconId) {
-        case "summary":
-            return <Icons.DocumentIcon />;
-        case "quiz":
-            return <Icons.PenIcon />;
-        case "grade":
-            return <Icons.GradeIcon />;
-        case "chat":
-            return <Icons.ChatIcon />;
-        default:
-            return <Icons.DocumentIcon />;
-    }
-};
+  const displayName =
+    currentUser?.full_name ?? currentUser?.email?.split("@")[0] ?? "there";
 
-const colorVariants = {
-    blue: "bg-blue-50/40 border-blue-100/70 hover:border-blue-300 hover:bg-blue-100/50 text-blue-500",
-    purple:
-        "bg-purple-50/40 border-purple-100/70 hover:border-purple-300 hover:bg-purple-100/50 text-purple-500",
-    amber:
-        "bg-amber-50/40 border-amber-100/70 hover:border-amber-300 hover:bg-amber-100/50 text-amber-600",
-    emerald:
-        "bg-emerald-50/40 border-emerald-100/70 hover:border-emerald-300 hover:bg-emerald-100/50 text-emerald-600",
-} as const;
+  useEffect(() => {
+    if (authLoading) return;
 
-export default function WorkspaceHomePage() {
-    const { currentUser, loading } = useAuth();
+    let cancelled = false;
 
-    const displayName =
-        currentUser?.full_name ??
-        currentUser?.email?.split("@")[0] ??
-        "bạn";
+    async function load() {
+      try {
+        const [statsRes, notebooksRes] = await Promise.all([
+          dashboardService.getStats(),
+          notebookService.getNotebooks(),
+        ]);
 
-    if (loading) {
-        return <WorkspaceSkeleton />;
+        if (cancelled) return;
+
+        setStats(statsRes);
+        setNotebooks(
+          [...notebooksRes]
+            .sort(
+              (a, b) =>
+                new Date(b.updated_at ?? b.created_at).getTime() -
+                new Date(a.updated_at ?? a.created_at).getTime()
+            )
+            .slice(0, 4)
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading]);
+
+  const handleDelete = async () => {
+    if (!deletingNotebook) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await notebookService.deleteNotebook(deletingNotebook.id);
+      setNotebooks((prev) => prev.filter((notebook) => notebook.id !== deletingNotebook.id));
+      setStats((prev) =>
+        prev ? { ...prev, notebook_count: Math.max(0, prev.notebook_count - 1) } : prev
+      );
+      setDeletingNotebook(null);
+    } catch (error: any) {
+      setDeleteError(error?.response?.data?.detail || "Failed to delete notebook. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (authLoading || loading) {
     return (
-        <div className="max-w-5xl mx-auto space-y-8 pt-4">
-            <div className="space-y-1.5">
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Xin chào, {displayName}
-                </h1>
+      <div className="min-h-full w-full p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto flex max-w-5xl flex-col gap-5">
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
 
-                <p className="text-xs text-gray-500">
-                    Hôm nay bạn muốn xử lý công việc gì?
-                </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-4 lg:p-5">
+                <Skeleton className="mb-2 h-8 w-8 rounded-full lg:mb-4 lg:h-10 lg:w-10" />
+                <Skeleton className="mb-2 h-8 w-12" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <Skeleton className="h-5 w-40" />
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-40 rounded-xl" />
+              ))}
             </div>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {WORKSPACE_FEATURES.map((feat) => {
-                    const variantClass =
-                        colorVariants[
-                            feat.color as keyof typeof colorVariants
-                        ];
-
-                    return (
-                        <Link
-                            key={feat.href}
-                            href={feat.href}
-                            className={`group flex h-[200px] flex-col overflow-hidden rounded-2xl border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${variantClass}`}
-                        >
-                            <div>
-                                <span className="mb-3 inline-block rounded-xl border border-inherit bg-white/80 p-2.5 shadow-sm transition-transform duration-300 group-hover:scale-110">
-                                    {renderFeatureIcon(feat.iconId)}
-                                </span>
-
-                                <h3 className="mb-2 text-base font-bold text-gray-900">
-                                    {feat.title}
-                                </h3>
-
-                                <p className="pointer-events-none line-clamp-3 text-[13px] text-gray-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                                    {feat.description}
-                                </p>
-                            </div>
-                        </Link>
-                    );
-                })}
-            </div>
+          </div>
         </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="min-h-full w-full p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 lg:gap-6">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="space-y-1.5">
+            <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              Welcome back, {displayName}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Your quiet corner for deep learning.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setEditingNotebook(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 self-start rounded-[10px] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:self-auto"
+          >
+            <AddIcon size={18} />
+            New Notebook
+          </button>
+        </div>
+
+        <StatCards
+          stats={
+            stats ?? {
+              notebook_count: 0,
+              document_count: 0,
+              message_count: 0,
+              quiz_count: 0,
+            }
+          }
+        />
+
+        <div className="flex flex-col gap-3 lg:gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-lg font-semibold text-foreground">
+              Recent Notebooks
+            </h2>
+            <Link
+              href="/notebooks"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+
+          {notebooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border p-10 text-center">
+              <LibraryIcon size={32} className="mx-auto mb-3 text-muted-foreground" />
+              <p className="font-heading text-base font-medium text-foreground">
+                No notebooks yet
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create your first notebook to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+              {notebooks.map((notebook) => (
+                <NotebookCard
+                  key={notebook.id}
+                  notebook={notebook}
+                  variant="dashboard"
+                  onEdit={(selected) => {
+                    setEditingNotebook(selected);
+                    setIsCreateModalOpen(true);
+                  }}
+                  onDelete={(selected) => {
+                    setDeleteError(null);
+                    setDeletingNotebook(selected);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <CreateNotebookModal
+          isOpen={isCreateModalOpen}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setEditingNotebook(null);
+          }}
+          initialNotebook={editingNotebook ?? undefined}
+          onSuccess={(savedNotebook) => {
+            setNotebooks((prev) =>
+              editingNotebook
+                ? prev.map((notebook) => notebook.id === savedNotebook.id ? savedNotebook : notebook)
+                : [savedNotebook, ...prev].slice(0, 4)
+            );
+            if (!editingNotebook) {
+              setStats((prev) =>
+                prev ? { ...prev, notebook_count: prev.notebook_count + 1 } : prev
+              );
+            }
+            setEditingNotebook(null);
+          }}
+        />
+        <DeleteNotebookDialog
+          notebook={deletingNotebook}
+          deleting={isDeleting}
+          error={deleteError}
+          onClose={() => {
+            setDeletingNotebook(null);
+            setDeleteError(null);
+          }}
+          onConfirm={handleDelete}
+        />
+      </div>
+    </div>
+  );
 }
