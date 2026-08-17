@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.dependencies import (
     ConversationServiceDep,
@@ -7,10 +7,12 @@ from app.core.dependencies import (
     get_current_user,
 )
 from app.schemas.conversation_schema import (
+    CreateConversationRequest,
     ConversationDetail,
     ConversationSummary,
     RenameConversationRequest,
 )
+from app.models.notebook_model import Notebook
 
 router = APIRouter(
     prefix="/conversations",
@@ -24,8 +26,37 @@ async def list_conversations(
     current_user: CurrentUserDep,
     db: DbSession,
     conversation_service: ConversationServiceDep,
+    notebook_id: int | None = Query(default=None),
 ):
-    return conversation_service.list_conversations(db, current_user.id)
+    return conversation_service.list_conversations(
+        db, current_user.id, notebook_id=notebook_id
+    )
+
+
+@router.post("", response_model=ConversationSummary, status_code=201)
+async def create_conversation(
+    payload: CreateConversationRequest,
+    current_user: CurrentUserDep,
+    db: DbSession,
+    conversation_service: ConversationServiceDep,
+):
+    notebook_exists = (
+        db.query(Notebook.id)
+        .filter(
+            Notebook.id == payload.notebook_id,
+            Notebook.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not notebook_exists:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+    return conversation_service.create_conversation(
+        db,
+        user_id=current_user.id,
+        title="New chat",
+        notebook_id=payload.notebook_id,
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)

@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 
-from app.core.dependencies import CurrentUserDep, UserServiceDep, get_current_user
+from app.core.dependencies import CurrentUserDep, PresenceServiceDep, UserServiceDep, get_current_user
 from app.core.security import set_refresh_cookie
 from app.schemas.user_schema import ChangePassword, UserResponse, UserStatus
 
@@ -43,6 +43,20 @@ async def get_user_status(
     target_id: Optional[int] = None,
 ):
     return await service.get_status(current_user, target_id)
+
+
+@router.post("/heartbeat", status_code=status.HTTP_200_OK)
+async def heartbeat(
+    current_user: CurrentUserDep,
+    presence: PresenceServiceDep,
+    timezone_offset_minutes: int = 0,
+):
+    # Keep the accepted browser timezone range bounded to UTC-14..UTC+14.
+    timezone_offset_minutes = max(-840, min(840, timezone_offset_minutes))
+    credited_seconds = await presence.heartbeat(
+        current_user.id, timezone_offset_minutes=timezone_offset_minutes
+    )
+    return {"credited_seconds": credited_seconds}
 
 
 @router.put("/change-password", status_code=status.HTTP_200_OK)

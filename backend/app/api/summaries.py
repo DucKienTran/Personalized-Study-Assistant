@@ -89,7 +89,7 @@ async def save_notebook_summary(
     status_code=status.HTTP_200_OK,
     response_model=BaseResponse,
 )
-async def overwrite_notebook_summary(
+async def update_notebook_summary(
     notebook_id: int,
     summary_id: int,
     payload: OverwriteNotebookSummaryRequest,

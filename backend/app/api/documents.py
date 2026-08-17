@@ -15,17 +15,15 @@ from app.core.dependencies import (
     CurrentUserDep,
     DocumentProcessingServiceDep,
     DocumentServiceDep,
-    SummaryRecordServiceDep,
-    SummaryServiceDep,
     get_current_user,
 )
 from app.schemas.document_schema import (
     DocumentContentOut,
     DocumentOut,
     FileUrlOut,
+    PastedTextDocumentCreate,
 )
 from app.schemas.response_schema import BaseResponse
-
 
 router = APIRouter(
     prefix="/documents",
@@ -64,6 +62,37 @@ async def upload_and_process_document(
         data=new_doc,
     )
 
+
+@router.post(
+    "/paste-text",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BaseResponse[DocumentOut],
+)
+async def create_document_from_text(
+    payload: PastedTextDocumentCreate,
+    background_tasks: BackgroundTasks,
+    doc_service: DocumentServiceDep,
+    processing_service: DocumentProcessingServiceDep,
+    current_user: CurrentUserDep,
+):
+    new_doc = await doc_service.upload_and_init_document(
+        file_bytes=payload.content.encode("utf-8"),
+        filename="pasted-text.txt",
+        user_id=current_user.id,
+        title=payload.title,
+    )
+
+    background_tasks.add_task(
+        processing_service.execute_processing_pipeline,
+        document_id=new_doc.id,
+        mongo_id=new_doc.mongo_id,
+        object_name=new_doc.file_path,
+    )
+
+    return BaseResponse(
+        message="Văn bản đã được tạo và đang được xử lý.",
+        data=new_doc,
+    )
 
 
 @router.get(
@@ -146,6 +175,27 @@ async def get_document_file_url(
     current_user: CurrentUserDep,
 ):
     url = await doc_service.get_document_file_url(
+        document_id=document_id,
+        user_id=current_user.id,
+    )
+
+    if url is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
+
+    return BaseResponse(data=FileUrlOut(url=url))
+
+
+@router.get(
+    "/{document_id}/download-url",
+    status_code=status.HTTP_200_OK,
+    response_model=BaseResponse[FileUrlOut],
+)
+async def get_document_download_url(
+    document_id: int,
+    doc_service: DocumentServiceDep,
+    current_user: CurrentUserDep,
+):
+    url = await doc_service.get_document_download_url(
         document_id=document_id,
         user_id=current_user.id,
     )

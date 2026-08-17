@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.core.dependencies import (
     CurrentUserDep,
+    MongoDbDep,
     NotebookServiceDep,
-    SummaryServiceDep,
     get_current_user,
 )
 from app.schemas.notebook_schema import (
@@ -15,7 +15,6 @@ from app.schemas.notebook_schema import (
     ToggleDocumentActiveRequest,
 )
 from app.schemas.response_schema import BaseResponse
-from app.schemas.summary_schema import GenerateNotebookSummaryRequest
 
 router = APIRouter(
     prefix="/notebooks",
@@ -104,7 +103,9 @@ async def update_notebook(
 
     notebook_out = NotebookOut.model_validate(updated_notebook)
     notebook_out.document_count = (
-        len(updated_notebook.notebook_documents) if updated_notebook.notebook_documents else 0
+        len(updated_notebook.notebook_documents)
+        if updated_notebook.notebook_documents
+        else 0
     )
 
     return BaseResponse(
@@ -122,10 +123,12 @@ async def delete_notebook(
     notebook_id: int,
     notebook_service: NotebookServiceDep,
     current_user: CurrentUserDep,
+    mongo_db: MongoDbDep,
 ):
-    result = notebook_service.delete_notebook(
+    result = await notebook_service.delete_notebook(
         notebook_id=notebook_id,
         current_user=current_user,
+        mongo_db=mongo_db,
     )
     return BaseResponse(message=result.get("detail", "Notebook deleted successfully."))
 
@@ -152,7 +155,9 @@ async def duplicate_notebook(
 
     notebook_out = NotebookOut.model_validate(duplicated_notebook)
     notebook_out.document_count = (
-        len(duplicated_notebook.notebook_documents) if duplicated_notebook.notebook_documents else 0
+        len(duplicated_notebook.notebook_documents)
+        if duplicated_notebook.notebook_documents
+        else 0
     )
 
     return BaseResponse(
@@ -223,5 +228,3 @@ async def toggle_document_active(
         data=payload,
     )
     return BaseResponse(message=result.get("detail"))
-
-
