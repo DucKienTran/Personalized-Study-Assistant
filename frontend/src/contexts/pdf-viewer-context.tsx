@@ -22,6 +22,8 @@ interface ViewerState {
 
   targetSnippet: string | null;
 
+  targetHeaderPath: string[];
+
   chunkId: string | null;
 
   highlightRequestId: number;
@@ -29,6 +31,8 @@ interface ViewerState {
 
 interface PdfViewerContextValue extends ViewerState {
   openCitation: (source: CitationSource) => void;
+
+  openDocument: (document: { id: number; title: string }) => void;
 
   closeViewer: () => void;
 
@@ -56,6 +60,8 @@ const DEFAULT_STATE: ViewerState = {
   currentPage: 1,
 
   targetSnippet: null,
+
+  targetHeaderPath: [],
 
   chunkId: null,
 
@@ -87,11 +93,31 @@ export function PdfViewerProvider({
 
         targetSnippet: source.snippet ?? null,
 
+        targetHeaderPath: source.headerPath,
+
         chunkId: source.chunkId,
 
         // force viewer react even when same page
         highlightRequestId:
           prev.highlightRequestId + 1,
+      }));
+    },
+    []
+  );
+
+  const openDocument = useCallback(
+    (document: { id: number; title: string }) => {
+      setState((prev) => ({
+        ...prev,
+        isOpen: true,
+        documentId: document.id,
+        documentTitle: document.title,
+        currentPage: prev.documentId === document.id ? prev.currentPage : 1,
+        targetSnippet: null,
+
+        targetHeaderPath: [],
+        chunkId: null,
+        highlightRequestId: prev.highlightRequestId + 1,
       }));
     },
     []
@@ -150,6 +176,8 @@ export function PdfViewerProvider({
         ...state,
 
         openCitation,
+
+        openDocument,
 
         closeViewer,
 
