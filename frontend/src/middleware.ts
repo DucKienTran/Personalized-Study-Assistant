@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const internalRoutes = ["/documents", "/quizzes", "/chat", "/dashboard", "/history"];
+  const internalRoutes = ["/library", "/quizzes", "/notebooks", "/dashboard"];
   const isInternalRoute = internalRoutes.some(
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
@@ -40,10 +40,9 @@ export const config = {
     "/login",
     "/register",
     "/register-admin",
-    "/documents/:path*",
+    "/library/:path*",
     "/quizzes/:path*",
-    "/chat/:path*",
+    "/notebooks/:path*",
     "/dashboard/:path*",
-    "/history/:path*",
   ],
 };
