@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 import logging
 from pathlib import Path
+import re
 from typing import Optional
+from urllib.parse import quote
 from uuid import uuid4
 
 from bson import ObjectId
@@ -12,12 +14,17 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.exceptions.base import BadRequestError
 from app.models.document_model import Document
+from app.services.document.metadata_builder import build_markdown_outline
 from app.storage.base import StorageService
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
-
+SUPPORTED_FILE_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+}
 
 class DocumentService:
     def __init__(
@@ -38,9 +45,7 @@ class DocumentService:
     # PRIVATE HELPERS
     # ==================================================
 
-    def _get_owned_document(
-        self, document_id: int, user_id: int
-    ) -> Optional[Document]:
+    def _get_owned_document(self, document_id: int, user_id: int) -> Optional[Document]:
         """Helper lấy thông tin Document thuộc sở hữu của user."""
         return (
             self.sql_db.query(Document)
@@ -76,10 +81,11 @@ class DocumentService:
         file_bytes: bytes,
         filename: str,
         user_id: int,
+        title: str | None = None,
     ) -> Document:
         extension = Path(filename).suffix.lower()
-        if extension not in SUPPORTED_EXTENSIONS:
-            raise BadRequestError("Hệ thống hiện chỉ hỗ trợ PDF và DOCX.")
+        if extension not in SUPPORTED_FILE_TYPES:
+            raise BadRequestError("Hệ thống hiện chỉ hỗ trợ PDF, DOCX, TXT và MD.")
 
         object_name = f"{uuid4()}{extension}"
 
@@ -91,15 +97,11 @@ class DocumentService:
             await self.storage_service.upload_file(
                 object_name=object_name,
                 file_bytes=file_bytes,
-                content_type=(
-                    "application/pdf"
-                    if extension == ".pdf"
-                    else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ),
+                content_type=SUPPORTED_FILE_TYPES[extension],
             )
             uploaded_to_storage = True
 
-            final_title = self._get_unique_title(user_id, filename)
+            final_title = self._get_unique_title(user_id, title or filename)
 
             # Khởi tạo document trên Mongo
             mongo_data = {
@@ -173,11 +175,20 @@ class DocumentService:
         if mongo_doc is None:
             return None
 
+        raw_text = mongo_doc.get("raw_text", mongo_doc.get("content_raw", ""))
+        stored_outline = mongo_doc.get("outline", [])
+        outline = (
+            stored_outline
+            if stored_outline and isinstance(stored_outline[0], dict)
+            else build_markdown_outline(raw_text)
+        )
+
         return {
             "title": document.title,
             "file_type": document.file_type,
             "total_pages": mongo_doc.get("total_pages", 0),
-            "content_raw": mongo_doc.get("content_raw", ""),
+            "content_raw": raw_text,
+            "outline": outline,
         }
 
     def get_document(
@@ -254,4 +265,38 @@ class DocumentService:
 
         return await self.storage_service.get_presigned_url(
             object_name=document.file_path,
+        )
+
+    async def get_document_download_url(
+        self,
+        document_id: int,
+        user_id: int,
+    ) -> Optional[str]:
+        document = self._get_owned_document(document_id, user_id)
+        if document is None:
+            return None
+
+        extension = f".{document.file_type.lower().lstrip('.')}"
+        content_type = SUPPORTED_FILE_TYPES.get(extension, "application/octet-stream")
+        filename = re.sub(r'[\\/\r\n\x00-\x1f\x7f"]', "_", document.title).strip()
+        duplicate_suffix = re.search(rf"{re.escape(extension)} \((\d+)\)$", filename, re.IGNORECASE)
+        if duplicate_suffix:
+            filename = (
+                filename[: duplicate_suffix.start()]
+                + f" ({duplicate_suffix.group(1)}){extension}"
+            )
+        elif not filename.lower().endswith(extension):
+            filename = f"{filename or 'document'}{extension}"
+
+        ascii_filename = filename.encode("ascii", "ignore").decode().strip() or f"document{extension}"
+        disposition = (
+            f'attachment; filename="{ascii_filename}"; '
+            f"filename*=UTF-8''{quote(filename, safe='')}"
+        )
+        return await self.storage_service.get_presigned_url(
+            object_name=document.file_path,
+            response_headers={
+                "response-content-disposition": disposition,
+                "response-content-type": content_type,
+            },
         )

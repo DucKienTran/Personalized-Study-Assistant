@@ -1,5 +1,6 @@
 # app/services/ai/embedding_service.py
-from typing import List, Any, Optional
+from typing import Any, List, Optional
+
 from app.ai.embeddings.base import BaseEmbeddingClient
 from app.ai.embeddings.voyage_client import VoyageEmbeddingClient
 
@@ -24,9 +25,7 @@ class EmbeddingService:
             return f"Context: {header_context}\n\n{content}"
         return content
 
-    def generate_chunks_embeddings(
-        self, chunks: List[Any], chunk_metadata: List[Any]
-    ) -> None:
+    def generate_chunks_embeddings(self, chunks: List[Any], chunk_metadata: List[Any]) -> None:
         """
         Tạo vector cho danh sách chunks và gán trực tiếp vào cm.embedding của ChunkMetadata.
         """
@@ -36,9 +35,7 @@ class EmbeddingService:
         texts_to_embed = []
         for chunk, cm in zip(chunks, chunk_metadata):
             header_path = getattr(cm, "header_path", [])
-            content = getattr(
-                chunk, "page_content", getattr(chunk, "content", str(chunk))
-            )
+            content = getattr(chunk, "page_content", getattr(chunk, "content", str(chunk)))
 
             if header_path:
                 header_context = " > ".join(header_path)

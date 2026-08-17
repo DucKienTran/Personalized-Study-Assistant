@@ -8,6 +8,9 @@ from langchain_text_splitters import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_CHUNK_SIZE = 1000
+DEFAULT_CHUNK_OVERLAP = 0
+
 
 class DocumentChunkBuilder:
     """
@@ -26,8 +29,8 @@ class DocumentChunkBuilder:
 
     def __init__(
         self,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 0,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
     ) -> None:
 
         self.header_splitter = MarkdownHeaderTextSplitter(

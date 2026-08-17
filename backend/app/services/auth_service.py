@@ -157,6 +157,7 @@ class AuthService:
 
         user = self.db.query(User).filter(User.email == data.email).first()
         if not user:
+            await self.email_service.send_no_account_found_email(to_email=data.email)
             return {"detail": uniform_message}
 
         raw_token = secrets.token_urlsafe(32)

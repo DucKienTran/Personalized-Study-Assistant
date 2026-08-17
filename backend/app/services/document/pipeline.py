@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 import logging
 from typing import Optional
 
-from app.services.ai.classifier_service import AIClassifier
-from app.ai.llm.base import LLMClient
 from app.ai.embeddings.base import BaseEmbeddingClient  # Import Base Client
-from app.services.ai.embedding_service import (
-    EmbeddingService,
-)  # Import Embedding Service
+from app.ai.llm.base import LLMClient
+
+# Import Embedding Service
 from app.services.document.chunk_builder import DocumentChunkBuilder
+from app.services.document.classifier_service import AIClassifier
 from app.services.document.cleaner import DocumentCleaner
+from app.services.document.embedding_service import (
+    EmbeddingService,
+)
 from app.services.document.metadata_builder import MetadataBuilder
 from app.services.document.models import ProcessedDocument
 
@@ -61,6 +64,7 @@ class DocumentProcessingPipeline:
         metadata, chunk_metadata = self.metadata_builder.build(
             chunks=sections,
             total_pages=total_pages,
+            markdown=cleaned_markdown,
         )
         logger.info("Metadata generation completed.")
 

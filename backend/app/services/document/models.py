@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.documents import Document
 
-from app.ai.constants import (
+from app.ai.constants.document_classification import (
     Category,
     Language,
     Purpose,
@@ -33,7 +33,7 @@ class DocumentMetadata:
     total_chunks: int
     total_characters: int
     estimated_tokens: int
-    outline: list[str] = field(default_factory=list)
+    outline: list[dict[str, str | int]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -62,7 +62,5 @@ class ProcessedDocument:
         """Trả về dữ liệu tinh gọn để lưu vào MongoDB collection parsed_documents"""
         return {
             "outline": self.metadata.outline,
-            "classification": (
-                self.classification.to_mongo() if self.classification else None
-            ),
+            "classification": (self.classification.to_mongo() if self.classification else None),
         }

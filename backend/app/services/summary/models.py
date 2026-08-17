@@ -57,4 +57,4 @@ class DigestSource(BaseModel):
 
     id: str
 
-    content: str    
+    content: str

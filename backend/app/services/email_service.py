@@ -1,6 +1,7 @@
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
+
 import aiosmtplib
 
 from app.core.config import settings
@@ -70,9 +71,7 @@ class EmailService:
             raise InternalServerError("Failed to send email. Please try again later.")
 
     # email_service.py — thêm method mới
-    async def send_already_registered_email(
-        self, to_email: str, full_name: str | None
-    ) -> None:
+    async def send_already_registered_email(self, to_email: str, full_name: str | None) -> None:
         name = full_name or "user"
         subject = "Registration Attempt"
         html_content = f"""
@@ -82,6 +81,21 @@ class EmailService:
                 <p>Someone just tried to register a new account using this email address, but an account already exists.</p>
                 <p>If this was you, you can <a href="{settings.FRONTEND_URL}/login">log in</a> or
                    <a href="{settings.FRONTEND_URL}/forgot-password">reset your password</a> if you forgot it.</p>
+                <p>If this wasn't you, you can safely ignore this email.</p>
+            </body>
+        </html>
+        """
+        await self._send_email(to_email, subject, html_content)
+
+    async def send_no_account_found_email(self, to_email: str) -> None:
+        subject = "Password Reset Request"
+        html_content = f"""
+        <html>
+            <body>
+                <p>Hello,</p>
+                <p>We received a password reset request for this email address, but no account is registered with it.</p>
+                <p>If you'd like to create an account, you can
+                   <a href="{settings.FRONTEND_URL}/register">register here</a>.</p>
                 <p>If this wasn't you, you can safely ignore this email.</p>
             </body>
         </html>

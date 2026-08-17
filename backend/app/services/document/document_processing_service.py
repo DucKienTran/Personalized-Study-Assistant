@@ -139,12 +139,6 @@ class DocumentProcessingService:
                     logger.info(
                         f"[Pipeline] chunk_metadata={len(processed_document.chunk_metadata)}"
                     )
-
-                    for i, chunk in enumerate(processed_document.chunks[:5]):
-                        logger.info(
-                            f"[Pipeline] Chunk {i}: len={len(chunk.page_content)} "
-                            f"text={repr(chunk.page_content[:100])}"
-                        )
                     chroma_collection.add(
                         ids=ids,
                         documents=documents,

@@ -1,6 +1,5 @@
-# app/services/ai/retrieval_models.py
+# app/services/rag/retrieval_models.py
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass(slots=True)

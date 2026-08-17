@@ -1,9 +1,11 @@
 import logging
-from typing import List
 import re
+from typing import List
 
-
+from bson import ObjectId
 from fastapi import HTTPException
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.errors import PyMongoError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -60,6 +62,7 @@ class NotebookService:
                 status_code=403, detail="Not authorized to access this document."
             )
         return document
+
     def _generate_duplicate_title(self, user_id: int, original_title: str) -> str:
         """
         Notebook
@@ -94,10 +97,21 @@ class NotebookService:
 
     def _calculate_notebook_statistics(self, notebook: Notebook) -> dict:
         """Calculate and return standard statistics for a notebook."""
-        active_document_count = sum(1 for nd in notebook.notebook_documents if nd.is_active)
+        active_document_count = sum(
+            1
+            for nd in notebook.notebook_documents
+            if nd.is_active and nd.document and nd.document.status == "completed"
+        )
         quiz_count = len(notebook.quizzes)
-        message_count = sum(len(conv.messages) for conv in notebook.conversations)
-        total_size = sum(nd.document.file_size for nd in notebook.notebook_documents if nd.document)
+        message_count = sum(
+            1
+            for conversation in notebook.conversations
+            for message in conversation.messages
+            if message.sender == "user"
+        )
+        total_size = sum(
+            nd.document.file_size for nd in notebook.notebook_documents if nd.document
+        )
 
         return {
             "active_document_count": active_document_count,
@@ -110,10 +124,14 @@ class NotebookService:
     # NOTEBOOK CRUD
     # ==================================================
 
-    def create_notebook(self, current_user: CurrentUser, data: NotebookCreate) -> Notebook:
+    def create_notebook(
+        self, current_user: CurrentUser, data: NotebookCreate
+    ) -> Notebook:
         title = data.title.strip()
         if not title:
-            raise HTTPException(status_code=400, detail="Notebook title cannot be empty.")
+            raise HTTPException(
+                status_code=400, detail="Notebook title cannot be empty."
+            )
 
         try:
             notebook = Notebook(
@@ -181,6 +199,16 @@ class NotebookService:
             updated_at=notebook.updated_at,
         )
 
+    def get_active_document_ids(self, notebook_id: int, user_id: int) -> list[int]:
+        notebook = self._get_owned_notebook(notebook_id, user_id)
+        return [
+            mapping.document_id
+            for mapping in notebook.notebook_documents
+            if mapping.is_active
+            and mapping.document
+            and mapping.document.status == "completed"
+        ]
+
     def update_notebook(
         self, notebook_id: int, current_user: CurrentUser, data: NotebookUpdate
     ) -> Notebook:
@@ -189,7 +217,9 @@ class NotebookService:
         if data.title is not None:
             title = data.title.strip()
             if not title:
-                raise HTTPException(status_code=400, detail="Notebook title cannot be empty.")
+                raise HTTPException(
+                    status_code=400, detail="Notebook title cannot be empty."
+                )
             notebook.title = title
 
         if data.description is not None:
@@ -201,7 +231,9 @@ class NotebookService:
         try:
             self.db.commit()
             self.db.refresh(notebook)
-            logger.info(f"Notebook {notebook.id} updated successfully by User {current_user.id}.")
+            logger.info(
+                f"Notebook {notebook.id} updated successfully by User {current_user.id}."
+            )
             return notebook
         except SQLAlchemyError as e:
             self.db.rollback()
@@ -210,24 +242,45 @@ class NotebookService:
                 status_code=500, detail="An error occurred while updating the notebook."
             )
 
-    def delete_notebook(self, notebook_id: int, current_user: CurrentUser) -> dict:
+    async def delete_notebook(
+        self,
+        notebook_id: int,
+        current_user: CurrentUser,
+        mongo_db: AsyncIOMotorDatabase,
+    ) -> dict:
         notebook = self._get_owned_notebook(notebook_id, current_user.id)
+        summary_ids = [
+            ObjectId(summary.mongo_summary_id)
+            for summary in notebook.summaries
+            if ObjectId.is_valid(summary.mongo_summary_id)
+        ]
 
         try:
             self.db.delete(notebook)
+            self.db.flush()
+            if summary_ids:
+                await mongo_db["notebook_summaries"].delete_many(
+                    {"_id": {"$in": summary_ids}}
+                )
             self.db.commit()
-            logger.info(f"Notebook {notebook_id} deleted successfully by User {current_user.id}.")
+            logger.info(
+                f"Notebook {notebook_id} deleted successfully by User {current_user.id}."
+            )
             return {"detail": "Notebook deleted successfully."}
-        except SQLAlchemyError as e:
+        except (SQLAlchemyError, PyMongoError) as e:
             self.db.rollback()
             logger.error(f"Database error during notebook deletion: {str(e)}")
             raise HTTPException(
                 status_code=500, detail="An error occurred while deleting the notebook."
             )
 
-    def duplicate_notebook(self, notebook_id: int, current_user: CurrentUser) -> Notebook:
+    def duplicate_notebook(
+        self, notebook_id: int, current_user: CurrentUser
+    ) -> Notebook:
         original_notebook = self._get_owned_notebook(notebook_id, current_user.id)
-        new_title = self._generate_duplicate_title(current_user.id, original_notebook.title)
+        new_title = self._generate_duplicate_title(
+            current_user.id, original_notebook.title
+        )
 
         try:
             new_notebook = Notebook(
@@ -248,7 +301,7 @@ class NotebookService:
                         is_active=nd.is_active,
                     )
                 )
-            
+
             if new_mappings:
                 self.db.add_all(new_mappings)
 
@@ -261,9 +314,12 @@ class NotebookService:
             return new_notebook
         except SQLAlchemyError as e:
             self.db.rollback()
-            logger.error(f"Database error during notebook duplication (ID: {notebook_id}): {str(e)}")
+            logger.error(
+                f"Database error during notebook duplication (ID: {notebook_id}): {str(e)}"
+            )
             raise HTTPException(
-                status_code=500, detail="An error occurred while duplicating the notebook."
+                status_code=500,
+                detail="An error occurred while duplicating the notebook.",
             )
 
     # ==================================================
@@ -277,10 +333,10 @@ class NotebookService:
         data: AddDocumentsToNotebookRequest,
     ) -> dict:
         notebook = self._get_owned_notebook(notebook_id, current_user.id)
-        
+
         # Deduplicate incoming ids first to avoid unnecessary queries
         unique_doc_ids = list(set(data.document_ids))
-        
+
         # Avoid duplicated inserts for already existing mappings
         existing_doc_ids = {nd.document_id for nd in notebook.notebook_documents}
         new_mappings = []
@@ -288,10 +344,10 @@ class NotebookService:
         for doc_id in unique_doc_ids:
             if doc_id in existing_doc_ids:
                 continue
-            
+
             # Verify document exists and ownership
             self._get_owned_document(doc_id, current_user.id)
-            
+
             new_mappings.append(
                 NotebookDocument(notebook_id=notebook.id, document_id=doc_id)
             )
@@ -305,14 +361,18 @@ class NotebookService:
                 )
             except SQLAlchemyError as e:
                 self.db.rollback()
-                logger.error(f"Database error while adding documents to notebook: {str(e)}")
+                logger.error(
+                    f"Database error while adding documents to notebook: {str(e)}"
+                )
                 raise HTTPException(
                     status_code=500, detail="An error occurred while adding documents."
                 )
 
         return {"detail": f"{len(new_mappings)} new documents added successfully."}
 
-    def remove_document(self, notebook_id: int, document_id: int, current_user: CurrentUser) -> dict:
+    def remove_document(
+        self, notebook_id: int, document_id: int, current_user: CurrentUser
+    ) -> dict:
         notebook = self._get_owned_notebook(notebook_id, current_user.id)
 
         mapping = (
@@ -322,7 +382,9 @@ class NotebookService:
         )
 
         if not mapping:
-            raise HTTPException(status_code=404, detail="Document not found in this notebook.")
+            raise HTTPException(
+                status_code=404, detail="Document not found in this notebook."
+            )
 
         try:
             self.db.delete(mapping)
@@ -333,7 +395,9 @@ class NotebookService:
             return {"detail": "Document removed from notebook successfully."}
         except SQLAlchemyError as e:
             self.db.rollback()
-            logger.error(f"Database error while removing document from notebook: {str(e)}")
+            logger.error(
+                f"Database error while removing document from notebook: {str(e)}"
+            )
             raise HTTPException(
                 status_code=500, detail="An error occurred while removing the document."
             )
@@ -354,12 +418,20 @@ class NotebookService:
         )
 
         if not mapping:
-            raise HTTPException(status_code=404, detail="Document not found in this notebook.")
+            raise HTTPException(
+                status_code=404, detail="Document not found in this notebook."
+            )
+
+        if mapping.document.status != "completed":
+            raise HTTPException(
+                status_code=409,
+                detail="Document can only be toggled after processing is completed.",
+            )
 
         try:
             mapping.is_active = data.is_active
             self.db.commit()
-            
+
             status = "activated" if data.is_active else "deactivated"
             logger.info(
                 f"Document {document_id} {status} in Notebook {notebook_id} by User {current_user.id}."
@@ -369,5 +441,6 @@ class NotebookService:
             self.db.rollback()
             logger.error(f"Database error while toggling document status: {str(e)}")
             raise HTTPException(
-                status_code=500, detail="An error occurred while updating document status."
+                status_code=500,
+                detail="An error occurred while updating document status.",
             )

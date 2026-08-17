@@ -45,7 +45,23 @@ class DocumentParserService:
             return self._parse_pdf(file_path)
         if extension == ".docx":
             return self._parse_docx(file_path)
-        raise BadRequestError("Only PDF and DOCX documents are currently supported.")
+        if extension == ".txt":
+            return self._parse_text(file_path)
+        if extension == ".md":
+            return self._parse_markdown(file_path)
+        raise BadRequestError("Only PDF, DOCX, TXT and MD documents are currently supported.")
+
+    def _parse_text(self, text_path: str) -> ParsedDocument:
+        text = Path(text_path).read_text(encoding="utf-8")
+        if not text.strip():
+            raise BadRequestError("The pasted text document is empty.")
+        return ParsedDocument(markdown=f"<!--page:1-->\n{text}", total_pages=1)
+
+    def _parse_markdown(self, markdown_path: str) -> ParsedDocument:
+        markdown = Path(markdown_path).read_text(encoding="utf-8")
+        if not markdown.strip():
+            raise BadRequestError("The Markdown document is empty.")
+        return ParsedDocument(markdown=f"<!--page:1-->\n{markdown}", total_pages=1)
 
     def _parse_pdf(self, pdf_path: str) -> ParsedDocument:
         doc = fitz.open(pdf_path)

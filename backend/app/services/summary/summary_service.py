@@ -89,19 +89,14 @@ class SummaryService:
         metadatas = results.get("metadatas", [])
 
         logger.info(
-            f"[Digest Debug] Document={doc.id} "
-            f"Chroma chunks={len(documents)}"
+            f"[Digest Debug] Document={doc.id} " f"Chroma chunks={len(documents)}"
         )
 
         if documents:
-            logger.info(
-                f"[Digest Debug] First chunk length={len(documents[0])} chars"
-            )
+            logger.info(f"[Digest Debug] First chunk length={len(documents[0])} chars")
 
             for i, chunk in enumerate(documents[:3]):
-                logger.info(
-                    f"[Digest Debug] Chunk {i}: {chunk[:300]}"
-                )
+                logger.info(f"[Digest Debug] Chunk {i}: {chunk[:300]}")
 
         # Empty document
         if not ids or not documents:
@@ -131,20 +126,15 @@ class SummaryService:
             )
 
             if result.matched_count == 0:
-                raise LLMGenerationError(
-                    f"Cannot cache digest for document {doc.id}"
-                )
+                raise LLMGenerationError(f"Cannot cache digest for document {doc.id}")
 
             return empty_digest
 
         combined = list(zip(ids, documents, metadatas))
-        combined.sort(
-            key=lambda x: x[2].get("chunk_index", x[0]) if x[2] else x[0]
-        )
+        combined.sort(key=lambda x: x[2].get("chunk_index", x[0]) if x[2] else x[0])
 
         units = [
-            DigestSource(id=chunk_id, content=text)
-            for chunk_id, text, _ in combined
+            DigestSource(id=chunk_id, content=text) for chunk_id, text, _ in combined
         ]
 
         is_leaf = True
@@ -182,15 +172,13 @@ class SummaryService:
                 response_str = await self.llm_client.generate(prompt)
 
                 if not response_str:
-                    raise LLMGenerationError(
-                        "LLM returned empty digest block."
-                    )
+                    raise LLMGenerationError("LLM returned empty digest block.")
 
                 cleaned_str = self._strip_markdown_fences(response_str)
                 # Strict structural validation using the Digest Pydantic model
                 try:
                     digest_obj = Digest.model_validate_json(cleaned_str)
-                
+
                 except ValidationError as e:
                     logger.exception(e)
                     logger.error(cleaned_str)
@@ -200,7 +188,7 @@ class SummaryService:
                     logger.exception("Unexpected")
                     logger.error(cleaned_str)
                     raise
-                              
+
                 # Strict source_refs validation
                 valid_ids = {u.id for u in batch}
 
@@ -226,8 +214,7 @@ class SummaryService:
             units = next_units
 
             logger.info(
-                f"[Digest] Completed Level={current_level} "
-                f"-> {len(units)} digests"
+                f"[Digest] Completed Level={current_level} " f"-> {len(units)} digests"
             )
 
             is_leaf = False
@@ -274,7 +261,9 @@ class SummaryService:
         if not notebook:
             raise ValueError("Notebook not found or unauthorized.")
 
-        active_docs = [nd.document for nd in notebook.notebook_documents if nd.is_active]
+        active_docs = [
+            nd.document for nd in notebook.notebook_documents if nd.is_active
+        ]
         if not active_docs:
             raise ValueError("Không có tài liệu nào đang được bật trong Notebook này.")
 
@@ -298,7 +287,9 @@ class SummaryService:
                     {"_id": ObjectId(summary_record.mongo_summary_id)}
                 )
                 if mongo_doc and "summary_text" in mongo_doc:
-                    logger.info(f"Notebook Summary cache hit for Notebook {notebook_id}")
+                    logger.info(
+                        f"Notebook Summary cache hit for Notebook {notebook_id}"
+                    )
                     return mongo_doc["summary_text"]
 
         # Retrieve or build Document Digests

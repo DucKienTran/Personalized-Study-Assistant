@@ -40,10 +40,7 @@ class TokenBatcher:
 
             token_count = self._count_tokens(unit.content)
 
-            if (
-                current_batch
-                and current_tokens + token_count > self.max_tokens
-            ):
+            if current_batch and current_tokens + token_count > self.max_tokens:
                 batches.append(current_batch)
                 current_batch = []
                 current_tokens = 0

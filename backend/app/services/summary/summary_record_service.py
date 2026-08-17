@@ -42,7 +42,9 @@ class SummaryRecordService:
             )
 
         # Lấy danh sách các file đang active tại thời điểm lưu để ghi vào metadata
-        active_doc_ids = [nd.document_id for nd in notebook.notebook_documents if nd.is_active]
+        active_doc_ids = [
+            nd.document_id for nd in notebook.notebook_documents if nd.is_active
+        ]
 
         mongo_data = {
             "summary_text": summary_text,
@@ -120,8 +122,6 @@ class SummaryRecordService:
             "message": "Cập nhật",
         }
 
-
-
     def get_summary_history_list(
         self,
         user_id: int,
@@ -157,7 +157,6 @@ class SummaryRecordService:
         )
 
         return summaries
-
 
     async def get_summary_detail(
         self,
