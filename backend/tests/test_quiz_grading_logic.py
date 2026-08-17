@@ -1,4 +1,8 @@
-from app.services.ai.quiz_service import QuizService
+from decimal import Decimal
+
+import pytest
+
+from app.services.quiz.quiz_service import QuizService
 
 
 class DummyDB:
@@ -6,16 +10,12 @@ class DummyDB:
         raise AssertionError("_grade_logic là pure logic, không được đụng DB")
 
 
-class DummyDocumentService:
-    pass
-
-
-class DummyAIClient:
+class DummyPipeline:
     pass
 
 
 def _service() -> QuizService:
-    return QuizService(DummyDB(), DummyDocumentService(), DummyAIClient())
+    return QuizService(DummyDB(), DummyPipeline())
 
 
 # ── multiple_choice ──────────────────────────────────────────────
@@ -67,25 +67,46 @@ def test_multiple_response_wrong_type_returns_false():
     assert service._grade_logic("multiple_response", ["A", "C"], "A") is False
 
 
+def test_multiple_response_partial_score_subtracts_incorrect_selections():
+    service = _service()
+    assert service._calculate_question_score(
+        "multiple_response", ["A", "C"], ["A", "B"], 4
+    ) == Decimal("0.00")
+    assert service._calculate_question_score(
+        "multiple_response", ["A", "C"], ["A"], 4
+    ) == Decimal("2.00")
+
+
+def test_multiple_response_score_never_goes_below_zero():
+    service = _service()
+    assert service._calculate_question_score(
+        "multiple_response", ["A", "C"], ["B", "D"], 4
+    ) == Decimal("0.00")
+
+
 # ── true_false ────────────────────────────────────────────────────
 
 
 def test_true_false_boolean_match():
     service = _service()
-    assert service._grade_logic("true_false", True, True) is True
+    assert service._grade_logic("true_false", [True, False], [True, False]) is True
 
 
 def test_true_false_string_variants():
     service = _service()
-    assert service._grade_logic("true_false", True, "true") is True
-    assert service._grade_logic("true_false", True, "1") is True
-    assert service._grade_logic("true_false", False, "false") is True
-    assert service._grade_logic("true_false", False, "0") is True
+    assert service._grade_logic("true_false", [True, False], ["1", "false"]) is True
 
 
 def test_true_false_unparseable_user_value_returns_false():
     service = _service()
-    assert service._grade_logic("true_false", True, "khong_ro") is False
+    assert service._grade_logic("true_false", [True], ["khong_ro"]) is False
+
+
+def test_true_false_awards_each_correct_statement_without_deduction():
+    service = _service()
+    assert service._calculate_question_score(
+        "true_false", [True, False, True, False], [True, True, True, True], 8
+    ) == Decimal("4.00")
 
 
 # ── fill_blank ────────────────────────────────────────────────────
@@ -129,10 +150,9 @@ def test_short_answer_exact_match():
     assert service._grade_logic("short_answer", "3.14", "3.14") is True
 
 
-def test_short_answer_accepts_comma_as_decimal_separator():
+def test_short_answer_collapses_extra_whitespace():
     service = _service()
-    assert service._grade_logic("short_answer", "3.14", "3,14") is True
-    assert service._grade_logic("short_answer", "0.5", "0,5") is True
+    assert service._grade_logic("short_answer", "New York", "  new   york ") is True
 
 
 def test_short_answer_wrong_value():
@@ -153,6 +173,24 @@ def test_none_user_answer_always_false_regardless_of_type():
         "short_answer",
     ]:
         assert service._grade_logic(q_type, "A", None) is False
+
+
+@pytest.mark.asyncio
+async def test_essay_ai_returns_achieved_count_and_backend_calculates_score():
+    class LLM:
+        async def generate(self, prompt: str):
+            assert "Do not calculate a score" in prompt
+            assert "Never provide examples, a model answer" in prompt
+            assert "same language as the question" in prompt
+            return '{"achieved_points_count": 2, "feedback": "Two points met."}'
+
+    pipeline = type("Pipeline", (), {"llm": LLM()})()
+    service = QuizService(DummyDB(), pipeline)
+    score, feedback = await service._grade_essay_answer(
+        "Explain the topic", ["Point 1", "Point 2", "Point 3"], "Answer", 9
+    )
+    assert score == Decimal("6.00")
+    assert feedback == "Two points met."
 
 
 def test_unknown_question_type_returns_false():

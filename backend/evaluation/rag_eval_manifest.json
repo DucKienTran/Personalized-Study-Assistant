@@ -1,0 +1,476 @@
+{
+  "Q01": {
+    "question": "Thời hạn gia hạn của Orion Enterprise là bao lâu?",
+    "expected": "30 ngày kể từ ngày gói dịch vụ hết hạn.",
+    "question_type": "direct",
+    "answerable": true,
+    "required_facts": [
+      "Orion Enterprise có thời hạn gia hạn 30 ngày kể từ ngày gói dịch vụ hết hạn."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Thời hạn gia hạn của Orion Enterprise là 30 ngày kể từ ngày gói dịch vụ hết hạn."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q02": {
+    "question": "Orion Lite cung cấp bao nhiêu GB dung lượng lưu trữ?",
+    "expected": "50 GB cho mỗi tổ chức.",
+    "question_type": "direct",
+    "answerable": true,
+    "required_facts": [
+      "Orion Lite cung cấp 50 GB dung lượng lưu trữ cho mỗi tổ chức."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "3.2. Dung lượng",
+        "snippet": "Orion Lite cung cấp 50 GB dung lượng lưu trữ cho mỗi tổ chức."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_8"
+    ],
+    "needs_resolution": false
+  },
+  "Q03": {
+    "question": "Mỗi file tải lên Orion Enterprise được phép có dung lượng tối đa bao nhiêu?",
+    "expected": "200 MB.",
+    "question_type": "direct",
+    "answerable": true,
+    "required_facts": [
+      "Mỗi file tải lên Orion Enterprise có dung lượng tối đa 200 MB."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.2. Dung lượng",
+        "snippet": "Mỗi file được tải lên có dung lượng tối đa 200 MB."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_5"
+    ],
+    "needs_resolution": false
+  },
+  "Q04": {
+    "question": "Nếu gói Enterprise vừa hết hạn thì khách hàng còn bao nhiêu ngày để gia hạn?",
+    "expected": "30 ngày.",
+    "question_type": "paraphrase",
+    "answerable": true,
+    "required_facts": [
+      "Thời hạn gia hạn của Orion Enterprise là 30 ngày."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Thời hạn gia hạn của Orion Enterprise là 30 ngày kể từ ngày gói dịch vụ hết hạn."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q05": {
+    "question": "Gói nào cho phép một tổ chức có tối đa 250 người dùng đang hoạt động?",
+    "expected": "Orion Enterprise.",
+    "question_type": "paraphrase",
+    "answerable": true,
+    "required_facts": [
+      "Orion Enterprise hỗ trợ tối đa 250 thành viên hoạt động."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.3. Thành viên",
+        "snippet": "Một tổ chức sử dụng Orion Enterprise có thể có tối đa 250 thành viên hoạt động."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_6"
+    ],
+    "needs_resolution": false
+  },
+  "Q06": {
+    "question": "Enterprise và Lite khác nhau như thế nào về chu kỳ sao lưu và thời gian lưu bản sao lưu?",
+    "expected": "Enterprise sao lưu mỗi 6 giờ và giữ 30 ngày; Lite sao lưu mỗi 24 giờ và giữ 7 ngày.",
+    "question_type": "comparison",
+    "answerable": true,
+    "required_facts": [
+      "Enterprise sao lưu mỗi 6 giờ.",
+      "Enterprise giữ bản sao lưu 30 ngày.",
+      "Lite sao lưu mỗi 24 giờ.",
+      "Lite giữ bản sao lưu 7 ngày."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "4. Chính sách sao lưu",
+        "snippet": "Dữ liệu của Orion Enterprise được sao lưu tự động mỗi 6 giờ. Các bản sao lưu được lưu giữ trong 30 ngày."
+      },
+      {
+        "heading": "4. Chính sách sao lưu",
+        "snippet": "Dữ liệu của Orion Lite được sao lưu tự động mỗi 24 giờ. Các bản sao lưu được lưu giữ trong 7 ngày."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_10"
+    ],
+    "needs_resolution": false
+  },
+  "Q07": {
+    "question": "Trong thời gian gia hạn Enterprise, khách hàng còn làm được gì và bị hạn chế gì?",
+    "expected": "Khách hàng vẫn có thể đăng nhập và xem tài liệu đã lưu. Sau 7 ngày đầu của thời gian gia hạn, họ không thể tạo workspace mới.",
+    "question_type": "multi_fact",
+    "answerable": true,
+    "required_facts": [
+      "Có thể đăng nhập và xem tài liệu đã lưu.",
+      "Không thể tạo workspace mới sau 7 ngày đầu của thời gian gia hạn."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Trong thời gian gia hạn, khách hàng vẫn có thể đăng nhập và xem các tài liệu đã lưu. Tuy nhiên, khách hàng không thể tạo workspace mới sau 7 ngày đầu tiên của thời gian gia hạn."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q08": {
+    "question": "Nếu tôi cần SSO và lưu nhật ký hoạt động ít nhất 6 tháng thì nên dùng gói nào?",
+    "expected": "Orion Enterprise, vì SSO chỉ có ở Enterprise và Enterprise lưu nhật ký hoạt động 180 ngày.",
+    "question_type": "multi_section",
+    "answerable": true,
+    "required_facts": [
+      "SSO chỉ có ở Enterprise.",
+      "Enterprise lưu nhật ký hoạt động 180 ngày."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "7. Bảo mật",
+        "snippet": "Single Sign-On (SSO) chỉ được cung cấp cho Orion Enterprise."
+      },
+      {
+        "heading": "7. Bảo mật",
+        "snippet": "Orion Enterprise lưu nhật ký hoạt động trong 180 ngày."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_13"
+    ],
+    "needs_resolution": false
+  },
+  "Q09": {
+    "question": "Orion Lite có thời gian gia hạn 30 ngày đúng không?",
+    "expected": "Không. Orion Lite có thời gian gia hạn 14 ngày; 30 ngày là thời gian gia hạn của Orion Enterprise.",
+    "question_type": "confusion",
+    "answerable": true,
+    "required_facts": [
+      "Lite = 14 ngày.",
+      "Enterprise = 30 ngày."
+    ],
+    "forbidden_facts": [
+      "Orion Lite có thời gian gia hạn 30 ngày."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "3.1. Gia hạn dịch vụ",
+        "snippet": "Thời hạn gia hạn của Orion Lite là 14 ngày kể từ ngày gói dịch vụ hết hạn."
+      },
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Thời hạn gia hạn của Orion Enterprise là 30 ngày kể từ ngày gói dịch vụ hết hạn."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_7",
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q10": {
+    "question": "Orion Enterprise chỉ hỗ trợ tối đa 25 thành viên phải không?",
+    "expected": "Không. Enterprise hỗ trợ tối đa 250 thành viên hoạt động; 25 là giới hạn của Orion Lite.",
+    "question_type": "confusion",
+    "answerable": true,
+    "required_facts": [
+      "Enterprise = 250 thành viên.",
+      "Lite = 25 thành viên."
+    ],
+    "forbidden_facts": [
+      "Enterprise chỉ hỗ trợ tối đa 25 thành viên."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "2.3. Thành viên",
+        "snippet": "Một tổ chức sử dụng Orion Enterprise có thể có tối đa 250 thành viên hoạt động."
+      },
+      {
+        "heading": "3.3. Thành viên",
+        "snippet": "Orion Lite hỗ trợ tối đa 25 thành viên hoạt động và tối đa 5 workspace."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_6",
+      "doc_21_chunk_9"
+    ],
+    "needs_resolution": false
+  },
+  "Q11": {
+    "question": "So sánh khả năng khôi phục dữ liệu của Enterprise và Lite.",
+    "expected": "Enterprise cho phép yêu cầu khôi phục từ bản sao lưu còn hạn và xử lý yêu cầu tiêu chuẩn trong 8 giờ làm việc. Lite không hỗ trợ yêu cầu khôi phục một bản sao lưu cụ thể; đội vận hành chỉ có thể khôi phục ở cấp hệ thống khi xảy ra sự cố.",
+    "question_type": "multi_section",
+    "answerable": true,
+    "required_facts": [
+      "Enterprise có thể yêu cầu khôi phục từ backup còn hạn.",
+      "Enterprise xử lý yêu cầu tiêu chuẩn trong 8 giờ làm việc.",
+      "Lite không hỗ trợ yêu cầu khôi phục một backup cụ thể.",
+      "Lite chỉ có thể được khôi phục ở cấp hệ thống khi có sự cố."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "5. Khôi phục dữ liệu",
+        "snippet": "Khách hàng Orion Enterprise có thể yêu cầu khôi phục dữ liệu từ một bản sao lưu còn trong thời hạn lưu giữ. Yêu cầu khôi phục tiêu chuẩn được xử lý trong vòng 8 giờ làm việc."
+      },
+      {
+        "heading": "5. Khôi phục dữ liệu",
+        "snippet": "Orion Lite không hỗ trợ yêu cầu khôi phục một bản sao lưu cụ thể. Trong trường hợp xảy ra sự cố hệ thống, đội vận hành có thể thực hiện khôi phục ở cấp hệ thống."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_11"
+    ],
+    "needs_resolution": false
+  },
+  "Q12": {
+    "question": "Gói Enterprise có những lợi thế nào về hỗ trợ kỹ thuật so với Lite?",
+    "expected": "Enterprise hỗ trợ 24/7 và có mục tiêu phản hồi ban đầu 1 giờ cho sự cố nghiêm trọng. Lite chỉ hỗ trợ 08:00–18:00 từ thứ Hai đến thứ Sáu và tài liệu không quy định thời gian phản hồi cụ thể theo mức độ nghiêm trọng.",
+    "question_type": "multi_fact",
+    "answerable": true,
+    "required_facts": [
+      "Enterprise hỗ trợ 24/7.",
+      "Enterprise có mục tiêu phản hồi 1 giờ cho sự cố nghiêm trọng.",
+      "Lite hỗ trợ 08:00–18:00 thứ Hai–thứ Sáu.",
+      "Lite không có thời gian phản hồi cụ thể theo severity trong tài liệu."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "6. Hỗ trợ kỹ thuật",
+        "snippet": "Orion Enterprise cung cấp hỗ trợ kỹ thuật 24 giờ mỗi ngày, 7 ngày mỗi tuần."
+      },
+      {
+        "heading": "6. Hỗ trợ kỹ thuật",
+        "snippet": "Orion Lite cung cấp hỗ trợ kỹ thuật từ 08:00 đến 18:00, từ thứ Hai đến thứ Sáu."
+      },
+      {
+        "heading": "6. Hỗ trợ kỹ thuật",
+        "snippet": "Mục tiêu thời gian phản hồi ban đầu đối với sự cố nghiêm trọng của Orion Enterprise là 1 giờ."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_12"
+    ],
+    "needs_resolution": false
+  },
+  "Q13": {
+    "question": "Tôi cần 100 thành viên, 10 workspace và file 120 MB. Gói Lite có đáp ứng được không?",
+    "expected": "Không. Lite chỉ hỗ trợ tối đa 25 thành viên, 5 workspace và file tối đa 50 MB. Enterprise đáp ứng cả ba yêu cầu với giới hạn 250 thành viên, 20 workspace và 200 MB mỗi file.",
+    "question_type": "cross_feature",
+    "answerable": true,
+    "required_facts": [
+      "Lite tối đa 25 thành viên.",
+      "Lite tối đa 5 workspace.",
+      "Lite tối đa 50 MB/file.",
+      "Enterprise tối đa 250 thành viên.",
+      "Enterprise tối đa 20 workspace.",
+      "Enterprise tối đa 200 MB/file."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.2. Dung lượng",
+        "snippet": "Mỗi file được tải lên có dung lượng tối đa 200 MB."
+      },
+      {
+        "heading": "2.3. Thành viên",
+        "snippet": "Một tổ chức sử dụng Orion Enterprise có thể có tối đa 250 thành viên hoạt động. Quản trị viên có thể tạo tối đa 20 workspace trong một tổ chức."
+      },
+      {
+        "heading": "3.2. Dung lượng",
+        "snippet": "Mỗi file được tải lên có dung lượng tối đa 50 MB."
+      },
+      {
+        "heading": "3.3. Thành viên",
+        "snippet": "Orion Lite hỗ trợ tối đa 25 thành viên hoạt động và tối đa 5 workspace."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_9",
+      "doc_21_chunk_8",
+      "doc_21_chunk_6",
+      "doc_21_chunk_5"
+    ],
+    "needs_resolution": false
+  },
+  "Q14": {
+    "question": "Một khách hàng Enterprise đã hết hạn gói 10 ngày nhưng chưa gia hạn. Họ có thể tạo workspace mới không?",
+    "expected": "Không. Enterprise chỉ cho phép tạo workspace mới trong 7 ngày đầu của thời gian gia hạn; ngày thứ 10 đã vượt giới hạn này.",
+    "question_type": "reasoning",
+    "answerable": true,
+    "required_facts": [
+      "Không thể tạo workspace mới sau 7 ngày đầu.",
+      "10 ngày > 7 ngày."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Khách hàng không thể tạo workspace mới sau 7 ngày đầu tiên của thời gian gia hạn."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q15": {
+    "question": "Enterprise đã hết hạn 35 ngày và chưa gia hạn thì tài khoản đang ở trạng thái nào theo tài liệu?",
+    "expected": "Read-only. Sau 30 ngày gia hạn, tài khoản chuyển sang read-only trong 15 ngày tiếp theo; ngày thứ 35 nằm trong giai đoạn đó.",
+    "question_type": "reasoning",
+    "answerable": true,
+    "required_facts": [
+      "Sau 30 ngày gia hạn tài khoản chuyển read-only trong 15 ngày tiếp theo.",
+      "Ngày 35 nằm trong khoảng này."
+    ],
+    "forbidden_facts": [],
+    "gold_evidence": [
+      {
+        "heading": "2.1. Gia hạn dịch vụ",
+        "snippet": "Nếu khách hàng không gia hạn sau khi kết thúc 30 ngày, tài khoản chuyển sang trạng thái read-only trong 15 ngày tiếp theo."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_4"
+    ],
+    "needs_resolution": false
+  },
+  "Q16": {
+    "question": "Orion Enterprise có giá bao nhiêu mỗi tháng?",
+    "expected": "Không có thông tin trong tài liệu.",
+    "question_type": "unanswerable",
+    "answerable": false,
+    "required_facts": [],
+    "forbidden_facts": [
+      "Bất kỳ giá/chi phí cụ thể nào không có trong tài liệu."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "9. Thông tin không được quy định",
+        "snippet": "Tài liệu này không cung cấp thông tin về giá bán hoặc phí thuê bao của Orion."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_15"
+    ],
+    "needs_resolution": false
+  },
+  "Q17": {
+    "question": "Chính sách hoàn tiền của Orion Lite là gì?",
+    "expected": "Không có thông tin trong tài liệu.",
+    "question_type": "unanswerable",
+    "answerable": false,
+    "required_facts": [],
+    "forbidden_facts": [
+      "Bất kỳ chính sách hoàn tiền cụ thể nào không có trong tài liệu."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "9. Thông tin không được quy định",
+        "snippet": "Tài liệu này không cung cấp thông tin về chính sách hoàn tiền."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_15"
+    ],
+    "needs_resolution": false
+  },
+  "Q18": {
+    "question": "Số điện thoại hỗ trợ kỹ thuật 24/7 của Orion Enterprise là gì?",
+    "expected": "Không có thông tin trong tài liệu. Tài liệu chỉ nói Enterprise hỗ trợ 24/7, không cung cấp số điện thoại.",
+    "question_type": "unanswerable",
+    "answerable": false,
+    "required_facts": [],
+    "forbidden_facts": [
+      "Bất kỳ số điện thoại cụ thể nào không có trong tài liệu."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "6. Hỗ trợ kỹ thuật",
+        "snippet": "Orion Enterprise cung cấp hỗ trợ kỹ thuật 24 giờ mỗi ngày, 7 ngày mỗi tuần."
+      },
+      {
+        "heading": "9. Thông tin không được quy định",
+        "snippet": "Tài liệu này không cung cấp thông tin về số điện thoại hỗ trợ."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_12",
+      "doc_21_chunk_15"
+    ],
+    "needs_resolution": false
+  },
+  "Q19": {
+    "question": "Orion có cung cấp bảo hiểm vận chuyển cho tài liệu bị thất lạc không?",
+    "expected": "Không có thông tin về bảo hiểm vận chuyển trong tài liệu.",
+    "question_type": "unanswerable",
+    "answerable": false,
+    "required_facts": [],
+    "forbidden_facts": [
+      "Bất kỳ chính sách bảo hiểm vận chuyển nào không có trong tài liệu."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "9. Thông tin không được quy định",
+        "snippet": "Tài liệu này không cung cấp thông tin về bảo hiểm vận chuyển."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_15"
+    ],
+    "needs_resolution": false
+  },
+  "Q20": {
+    "question": "Orion Lite có ứng dụng dành cho Apple Watch không?",
+    "expected": "Không có thông tin trong tài liệu.",
+    "question_type": "unanswerable",
+    "answerable": false,
+    "required_facts": [],
+    "forbidden_facts": [
+      "Khẳng định có hoặc không có Apple Watch app nếu không dựa trên nội dung tài liệu."
+    ],
+    "gold_evidence": [
+      {
+        "heading": "9. Thông tin không được quy định",
+        "snippet": "Tài liệu này không cung cấp thông tin về ứng dụng Orion dành cho Apple Watch."
+      }
+    ],
+    "gold_chunks": [
+      "doc_21_chunk_15"
+    ],
+    "needs_resolution": false
+  }
+}

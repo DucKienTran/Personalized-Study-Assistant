@@ -1,6 +1,41 @@
+from decimal import Decimal
+
+from pydantic import ValidationError
 import pytest
 
-from app.services.ai.quiz_service import QuizService
+from app.schemas.quiz_schema import QuizGenerateRequest
+from app.services.quiz.quiz_service import QuizService
+
+
+def _request(**overrides):
+    data = {
+        "notebook_id": 1,
+        "mode": "study",
+        "generation_strategy": "manual",
+        "difficulty_distribution": {"easy": 1.0},
+        **overrides,
+    }
+    return QuizGenerateRequest(**data)
+
+
+def test_target_total_points_defaults_when_null():
+    assert _request(target_total_points=None).target_total_points == 100
+
+
+def test_target_total_points_must_allow_one_cent_per_question():
+    with pytest.raises(ValidationError):
+        _request(total_questions=10, target_total_points=Decimal("0.09"))
+
+
+def test_target_total_points_accepts_fractional_values():
+    request = _request(total_questions=10, target_total_points=Decimal("5.50"))
+
+    assert request.target_total_points == Decimal("5.50")
+
+
+def test_target_total_points_rejects_more_than_two_decimal_places():
+    with pytest.raises(ValidationError):
+        _request(target_total_points=Decimal("10.555"))
 
 
 def test_no_patch_needed_when_already_matching_target():
@@ -25,11 +60,27 @@ def test_patch_negative_drift_never_goes_below_one():
     assert all(q["points"] >= 1 for q in result)
 
 
-def test_patch_raises_when_cannot_reduce_further():
-    # 3 câu đều 1 điểm, tổng=3, target=1 -> không thể giảm thêm (mọi câu đã ở mức tối thiểu)
+def test_patch_distributes_fractional_target_exactly():
     questions = [{"points": 1}, {"points": 1}, {"points": 1}]
+
+    result = QuizService._patch_points_distributed(
+        questions, target=Decimal("1.50")
+    )
+
+    assert sum(q["points"] for q in result) == Decimal("1.50")
+    assert all(q["points"] >= Decimal("0.01") for q in result)
+
+
+def test_patch_raises_when_cannot_reduce_further():
+    questions = [
+        {"points": Decimal("0.01")},
+        {"points": Decimal("0.01")},
+        {"points": Decimal("0.01")},
+    ]
     with pytest.raises(ValueError):
-        QuizService._patch_points_distributed(questions, target=1)
+        QuizService._patch_points_distributed(
+            questions, target=Decimal("0.02")
+        )
 
 
 def test_patch_empty_questions_list_is_noop():
