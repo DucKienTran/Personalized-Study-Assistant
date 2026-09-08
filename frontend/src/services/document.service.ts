@@ -38,7 +38,7 @@ interface UploadResponseData {
 }
 
 export const documentService = {
-    async listDocuments(params?: { status_filter?: string; skip?: number; limit?: number }) {
+    async listDocuments(params?: { status_filter?: string; search?: string; skip?: number; limit?: number }) {
         const res = await api.get<ApiResponse<DocumentListItem[]>>("/documents/", { params });
         return res.data.data;
     },

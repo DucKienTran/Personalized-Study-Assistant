@@ -103,6 +103,7 @@ async def get_documents(
     current_user: CurrentUserDep,
     document_id: Optional[int] = Query(None),
     status_filter: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, le=100),
 ):
@@ -122,6 +123,7 @@ async def get_documents(
         skip=skip,
         limit=limit,
         status_filter=status_filter,
+        search=search,
     )
 
     return BaseResponse(data=docs)

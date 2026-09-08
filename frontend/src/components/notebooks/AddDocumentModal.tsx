@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Icon } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import { documentService, DocumentListItem } from "@/services/document.service";
@@ -34,7 +34,14 @@ export function AddDocumentModal({
   // State cho tab chọn tài liệu sẵn có
   const [existingDocs, setExistingDocs] = useState<DocumentListItem[]>([]);
   const [loadingExistingDocs, setLoadingExistingDocs] = useState(false);
+  const [loadingMoreExistingDocs, setLoadingMoreExistingDocs] = useState(false);
+  const [hasMoreExistingDocs, setHasMoreExistingDocs] = useState(true);
+  const [existingSearch, setExistingSearch] = useState("");
+  const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
   const [selectedDocIds, setSelectedDocIds] = useState<number[]>([]);
+  const existingRequestIdRef = useRef(0);
+  const existingLoadMoreRef = useRef<HTMLDivElement>(null);
+  const EXISTING_PAGE_SIZE = 20;
 
   // Tải danh sách tài liệu trong thư viện khi modal mở
   useEffect(() => {
@@ -44,21 +51,80 @@ export function AddDocumentModal({
       setAddDocTab("upload");
       setUploadSource("file");
       setTextContent("");
-      if (showExisting) loadExistingDocuments();
+      setExistingSearch("");
+      setDebouncedExistingSearch("");
     }
   }, [isOpen, showExisting]);
 
-  const loadExistingDocuments = async () => {
-    try {
-      setLoadingExistingDocs(true);
-      const docs = await documentService.listDocuments();
-      setExistingDocs(docs);
-    } catch (err) {
-      console.error("Failed to fetch existing documents:", err);
-    } finally {
-      setLoadingExistingDocs(false);
-    }
-  };
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedExistingSearch(existingSearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [existingSearch]);
+
+  const loadExistingDocuments = useCallback(
+    async (reset: boolean) => {
+      if (!showExisting || !isOpen) return;
+
+      const requestId = ++existingRequestIdRef.current;
+      const skip = reset ? 0 : existingDocs.length;
+
+      try {
+        if (reset) {
+          setLoadingExistingDocs(true);
+        } else {
+          setLoadingMoreExistingDocs(true);
+        }
+
+        const docs = await documentService.listDocuments({
+          skip,
+          limit: EXISTING_PAGE_SIZE,
+          search: debouncedExistingSearch || undefined,
+        });
+
+        if (requestId !== existingRequestIdRef.current) return;
+
+        setExistingDocs((current) => (reset ? docs : [...current, ...docs]));
+        setHasMoreExistingDocs(docs.length === EXISTING_PAGE_SIZE);
+      } catch (err) {
+        if (requestId !== existingRequestIdRef.current) return;
+        console.error("Failed to fetch existing documents:", err);
+        setUploadError("Failed to load existing documents.");
+      } finally {
+        if (requestId === existingRequestIdRef.current) {
+          setLoadingExistingDocs(false);
+          setLoadingMoreExistingDocs(false);
+        }
+      }
+    },
+    [debouncedExistingSearch, existingDocs.length, isOpen, showExisting]
+  );
+
+  useEffect(() => {
+    if (!isOpen || !showExisting) return;
+    setExistingDocs([]);
+    setHasMoreExistingDocs(true);
+    void loadExistingDocuments(true);
+    // loadExistingDocuments intentionally omitted: this effect resets pagination only when the query/modal changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedExistingSearch, isOpen, showExisting]);
+
+  useEffect(() => {
+    const target = existingLoadMoreRef.current;
+    if (!target || !hasMoreExistingDocs || loadingExistingDocs || loadingMoreExistingDocs) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void loadExistingDocuments(false);
+      },
+      { rootMargin: "120px" }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreExistingDocs, loadingExistingDocs, loadingMoreExistingDocs, loadExistingDocuments]);
 
   if (!isOpen) return null;
 
@@ -331,14 +397,29 @@ export function AddDocumentModal({
           {/* TAB 2: CHỌN TÀI LIỆU ĐÃ CÓ */}
           {showExisting && addDocTab === "existing" && (
             <div className="flex h-full min-h-0 flex-col gap-4">
+              <div className="relative shrink-0">
+                <Icon
+                  name="search"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-muted-foreground"
+                />
+                <input
+                  type="search"
+                  value={existingSearch}
+                  onChange={(event) => setExistingSearch(event.target.value)}
+                  placeholder="Search documents..."
+                  aria-label="Search existing documents by filename"
+                  className="h-10 w-full rounded-lg border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </div>
+
               {loadingExistingDocs ? (
                 <div className="flex flex-1 items-center justify-center gap-2 py-10 text-center text-xs text-muted-foreground">
                   <Icon name="progress_activity" className="animate-spin text-lg" />
                   Loading documents...
                 </div>
-              ) : availableDocs.length === 0 ? (
+              ) : availableDocs.length === 0 && !hasMoreExistingDocs ? (
                 <div className="flex flex-1 items-center justify-center py-10 text-center text-xs text-muted-foreground">
-                  No other documents available in your library.
+                  {debouncedExistingSearch ? "No documents found." : "No other documents available in your library."}
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -376,6 +457,13 @@ export function AddDocumentModal({
                       </div>
                     );
                   })}
+                  {hasMoreExistingDocs && <div ref={existingLoadMoreRef} className="h-px" aria-hidden="true" />}
+                  {loadingMoreExistingDocs && (
+                    <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+                      <Icon name="progress_activity" className="animate-spin text-base" />
+                      Loading more...
+                    </div>
+                  )}
                 </div>
               )}
 

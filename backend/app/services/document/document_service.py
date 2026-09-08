@@ -204,11 +204,15 @@ class DocumentService:
         skip: int = 0,
         limit: int = 10,
         status_filter: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> list[Document]:
         query = self.sql_db.query(Document).filter(Document.user_id == user_id)
 
         if status_filter:
             query = query.filter(Document.status == status_filter)
+
+        if search and search.strip():
+            query = query.filter(Document.title.ilike(f"%{search.strip()}%"))
 
         return (
             query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
