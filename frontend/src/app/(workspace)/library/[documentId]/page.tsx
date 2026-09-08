@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import axios from "axios";
 import { DocumentViewerPanel } from "@/components/document-viewer/document-viewer-panel";
+import { AccessNotFound } from "@/components/shared/AccessNotFound";
 import { ProgressActivityIcon, WarningIcon } from "@/components/shared/icons";
 import { usePdfViewer } from "@/contexts/pdf-viewer-context";
 import { documentService } from "@/services/document.service";
@@ -13,27 +15,34 @@ export default function LibraryDocumentPage() {
   const routeDocumentId = Number(params.documentId);
   const { documentId, openDocument, closeViewer } = usePdfViewer();
   const [error, setError] = useState<string | null>(null);
+  const [accessNotFound, setAccessNotFound] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(routeDocumentId) || routeDocumentId <= 0) {
-      setError("Invalid document.");
+      setAccessNotFound(true);
       return;
     }
 
     let active = true;
     setError(null);
+    setAccessNotFound(false);
     documentService
       .getDocument(routeDocumentId)
       .then((document) => {
         if (!active) return;
         if (!document) {
-          setError("Document not found.");
+          setAccessNotFound(true);
           return;
         }
         openDocument({ id: document.id, title: document.title });
       })
-      .catch(() => {
-        if (active) setError("Unable to load this document.");
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (axios.isAxiosError(error) && (error.response?.status === 403 || error.response?.status === 404)) {
+          setAccessNotFound(true);
+        } else {
+          setError("Unable to load this document.");
+        }
       });
 
     return () => {
@@ -45,6 +54,10 @@ export default function LibraryDocumentPage() {
     closeViewer();
     router.push("/library");
   };
+
+  if (accessNotFound) {
+    return <AccessNotFound />;
+  }
 
   if (error) {
     return (
