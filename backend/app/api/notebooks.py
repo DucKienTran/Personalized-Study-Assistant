@@ -4,6 +4,7 @@ from app.core.dependencies import (
     CurrentUserDep,
     MongoDbDep,
     NotebookServiceDep,
+    MindmapServiceDep,
     get_current_user,
 )
 from app.schemas.notebook_schema import (
@@ -15,6 +16,7 @@ from app.schemas.notebook_schema import (
     ToggleDocumentActiveRequest,
 )
 from app.schemas.response_schema import BaseResponse
+from app.schemas.mindmap_schema import MindmapCreate, MindmapListItem, MindmapOut
 
 router = APIRouter(
     prefix="/notebooks",
@@ -228,3 +230,66 @@ async def toggle_document_active(
         data=payload,
     )
     return BaseResponse(message=result.get("detail"))
+
+
+# ==================================================
+# MINDMAPS
+# ==================================================
+
+@router.get(
+    "/{notebook_id}/mindmaps",
+    status_code=status.HTTP_200_OK,
+    response_model=BaseResponse[list[MindmapListItem]],
+)
+async def list_mindmaps(
+    notebook_id: int,
+    mindmap_service: MindmapServiceDep,
+    current_user: CurrentUserDep,
+):
+    items = mindmap_service.list_mindmaps(notebook_id, current_user)
+    return BaseResponse(data=[MindmapListItem.model_validate(item) for item in items])
+
+
+@router.post(
+    "/{notebook_id}/mindmaps",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BaseResponse[MindmapOut],
+)
+async def create_mindmap(
+    notebook_id: int,
+    payload: MindmapCreate,
+    mindmap_service: MindmapServiceDep,
+    current_user: CurrentUserDep,
+):
+    item = await mindmap_service.create_mindmap(notebook_id, payload, current_user)
+    return BaseResponse(message="Mindmap created successfully.", data=MindmapOut.model_validate(item))
+
+
+@router.get(
+    "/{notebook_id}/mindmaps/{mindmap_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=BaseResponse[MindmapOut],
+)
+async def get_mindmap(
+    notebook_id: int,
+    mindmap_id: int,
+    mindmap_service: MindmapServiceDep,
+    current_user: CurrentUserDep,
+):
+    item = mindmap_service.get_mindmap(notebook_id, mindmap_id, current_user)
+    return BaseResponse(data=MindmapOut.model_validate(item))
+
+
+@router.delete(
+    "/{notebook_id}/mindmaps/{mindmap_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=BaseResponse,
+)
+async def delete_mindmap(
+    notebook_id: int,
+    mindmap_id: int,
+    mindmap_service: MindmapServiceDep,
+    current_user: CurrentUserDep,
+):
+    mindmap_service.delete_mindmap(notebook_id, mindmap_id, current_user)
+    return BaseResponse(message="Mindmap deleted successfully.")

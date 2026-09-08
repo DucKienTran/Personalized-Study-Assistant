@@ -28,6 +28,9 @@ from app.exceptions import (
 )
 from app.exceptions.auth import InvalidTokenError
 from app.schemas.user_schema import CurrentUser
+from app.services.assistant.action_executor import AssistantActionExecutor
+from app.services.assistant.action_router import AssistantActionRouter
+from app.services.assistant.generation_orchestrator import AssistantGenerationOrchestrator
 from app.services.auth_service import AuthService
 from app.services.dashboard.dashboard_insight_service import DashboardInsightService
 from app.services.dashboard.dashboard_service import DashboardService
@@ -39,6 +42,9 @@ from app.services.document.document_service import DocumentService
 from app.services.document.embedding_service import EmbeddingService
 from app.services.document.parser import DocumentParserService
 from app.services.email_service import EmailService
+from app.services.flashcard.flashcard_scheduler import FlashcardScheduler, FSRSScheduler
+from app.services.flashcard.flashcard_service import FlashcardService
+from app.services.mindmap.mindmap_service import MindmapService
 from app.services.notebook.notebook_service import NotebookService
 from app.services.presence_service import PresenceService
 from app.services.quiz.chunk_selector import QuizChunkSelector
@@ -48,6 +54,7 @@ from app.services.quiz.personal_offset_service import PersonalOffsetService
 from app.services.quiz.quiz_pipeline import QuizPipeline
 from app.services.quiz.quiz_service import QuizService
 from app.services.rag.conversation_service import ConversationService
+from app.services.rag.conversation_title_ai_service import ConversationTitleAIService
 from app.services.rag.rag_service import RAGService
 from app.services.rag.retrieval_service import RetrievalService
 from app.services.summary.summary_record_service import SummaryRecordService
@@ -207,6 +214,34 @@ def get_notebook_service(
 
 
 NotebookServiceDep = Annotated[NotebookService, Depends(get_notebook_service)]
+
+
+@lru_cache
+def get_flashcard_scheduler() -> FlashcardScheduler:
+    return FSRSScheduler()
+
+
+FlashcardSchedulerDep = Annotated[FlashcardScheduler, Depends(get_flashcard_scheduler)]
+
+
+def get_mindmap_service(
+    db: DbSession,
+    chroma_client: ChromaClientDep,
+    llm_client: LLMClientDep,
+) -> MindmapService:
+    return MindmapService(db=db, chroma_client=chroma_client, llm_client=llm_client)
+
+
+MindmapServiceDep = Annotated[MindmapService, Depends(get_mindmap_service)]
+
+
+def get_assistant_action_router(llm_client: LLMClientDep) -> AssistantActionRouter:
+    return AssistantActionRouter(llm_client)
+
+
+AssistantActionRouterDep = Annotated[
+    AssistantActionRouter, Depends(get_assistant_action_router)
+]
 
 
 def get_presence_service(redis: RedisDep, db: DbSession) -> PresenceService:
@@ -387,18 +422,44 @@ FeedbackServiceDep = Annotated[
     Depends(get_feedback_service),
 ]
 
-def get_quiz_pipeline(
+def get_quiz_chunk_selector(
     chroma_client: ChromaClientDep,
-    llm_client: LLMClientDep,
     embedding_service: EmbeddingServiceDep,
+) -> QuizChunkSelector:
+    return QuizChunkSelector(
+        chroma_client=chroma_client,
+        collection_name=settings.CHROMA_COLLECTION_NAME,
+        embedding_service=embedding_service,
+    )
+
+
+QuizChunkSelectorDep = Annotated[QuizChunkSelector, Depends(get_quiz_chunk_selector)]
+
+
+def get_flashcard_service(
+    db: DbSession,
+    scheduler: FlashcardSchedulerDep,
+    chunk_selector: QuizChunkSelectorDep,
+    llm_client: LLMClientDep,
+) -> FlashcardService:
+    return FlashcardService(
+        db=db,
+        scheduler=scheduler,
+        chunk_selector=chunk_selector,
+        llm_client=llm_client,
+    )
+
+
+FlashcardServiceDep = Annotated[FlashcardService, Depends(get_flashcard_service)]
+
+
+def get_quiz_pipeline(
+    llm_client: LLMClientDep,
+    chunk_selector: QuizChunkSelectorDep,
 ) -> QuizPipeline:
     return QuizPipeline(
         llm=llm_client,
-        chunk_selector=QuizChunkSelector(
-            chroma_client=chroma_client,
-            collection_name=settings.CHROMA_COLLECTION_NAME,
-            embedding_service=embedding_service,
-        ),
+        chunk_selector=chunk_selector,
         prompt_builder=QuizPromptBuilder(),
         instruction_parser=QuizInstructionParser(llm_client),
     )
@@ -415,6 +476,43 @@ def get_quiz_service(
 
 
 QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service)]
+
+
+def get_assistant_generation_orchestrator(
+    quiz_service: QuizServiceDep,
+    flashcard_service: FlashcardServiceDep,
+    notebook_service: NotebookServiceDep,
+    personal_offset_service: PersonalOffsetServiceDep,
+) -> AssistantGenerationOrchestrator:
+    return AssistantGenerationOrchestrator(
+        quiz_service=quiz_service,
+        flashcard_service=flashcard_service,
+        notebook_service=notebook_service,
+        personal_offset_service=personal_offset_service,
+    )
+
+
+AssistantGenerationOrchestratorDep = Annotated[
+    AssistantGenerationOrchestrator,
+    Depends(get_assistant_generation_orchestrator),
+]
+
+
+def get_assistant_action_executor(
+    summary_service: SummaryServiceDep,
+    mindmap_service: MindmapServiceDep,
+    generation_orchestrator: AssistantGenerationOrchestratorDep,
+) -> AssistantActionExecutor:
+    return AssistantActionExecutor(
+        summary_service=summary_service,
+        mindmap_service=mindmap_service,
+        generation_orchestrator=generation_orchestrator,
+    )
+
+
+AssistantActionExecutorDep = Annotated[
+    AssistantActionExecutor, Depends(get_assistant_action_executor)
+]
 
 
 def get_retrieval_service(
@@ -443,6 +541,18 @@ def get_rag_service(
 
 
 RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
+
+
+def get_conversation_title_ai_service(
+    llm_client: LLMClientDep,
+) -> ConversationTitleAIService:
+    return ConversationTitleAIService(llm_client=llm_client)
+
+
+ConversationTitleAIServiceDep = Annotated[
+    ConversationTitleAIService,
+    Depends(get_conversation_title_ai_service),
+]
 
 
 def get_conversation_service() -> ConversationService:

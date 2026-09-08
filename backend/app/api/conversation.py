@@ -6,13 +6,14 @@ from app.core.dependencies import (
     DbSession,
     get_current_user,
 )
+from app.models.notebook_model import Notebook
 from app.schemas.conversation_schema import (
-    CreateConversationRequest,
     ConversationDetail,
     ConversationSummary,
+    CreateConversationRequest,
     RenameConversationRequest,
 )
-from app.models.notebook_model import Notebook
+from app.services.rag.conversation_service import DEFAULT_CONVERSATION_TITLE
 
 router = APIRouter(
     prefix="/conversations",
@@ -54,7 +55,7 @@ async def create_conversation(
     return conversation_service.create_conversation(
         db,
         user_id=current_user.id,
-        title="New chat",
+        title=DEFAULT_CONVERSATION_TITLE,
         notebook_id=payload.notebook_id,
     )
 

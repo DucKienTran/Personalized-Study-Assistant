@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -17,6 +18,7 @@ class MessageOut(BaseModel):
     sender: str
     content: str
     sources_json: Optional[str] = None
+    resource_json: Optional[str] = None
     created_at: datetime
 
     class Config:

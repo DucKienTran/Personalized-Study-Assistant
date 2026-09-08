@@ -12,6 +12,9 @@ from app.api.auth import router as auth_router
 from app.api.conversation import router as conversation_router
 from app.api.dashboard import router as dashboard_router
 from app.api.documents import router as documents_router
+from app.api.flashcards import card_router as flashcard_card_router
+from app.api.flashcards import deck_router as flashcard_deck_router
+from app.api.flashcards import session_router as flashcard_session_router
 from app.api.notebooks import router as notebooks_router
 from app.api.quizzes import attempts_router as quiz_attempts_router
 from app.api.quizzes import router as quizzes_router
@@ -129,6 +132,9 @@ app.include_router(auth_router, prefix=settings.API_STR)
 app.include_router(users_router, prefix=settings.API_STR)
 app.include_router(notebooks_router, prefix=settings.API_STR)
 app.include_router(documents_router, prefix=settings.API_STR)
+app.include_router(flashcard_deck_router, prefix=settings.API_STR)
+app.include_router(flashcard_card_router, prefix=settings.API_STR)
+app.include_router(flashcard_session_router, prefix=settings.API_STR)
 app.include_router(dashboard_router, prefix=settings.API_STR)
 app.include_router(summaries_router, prefix=settings.API_STR)
 app.include_router(quizzes_router, prefix=settings.API_STR)

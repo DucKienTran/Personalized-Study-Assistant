@@ -30,6 +30,7 @@ filelock==3.31.1
 flashrank
 flatbuffers==25.12.19
 frozenlist==1.8.0
+fsrs==6.3.2
 fsspec==2026.6.0
 google-ai-generativelanguage==0.6.15
 google-api-core==2.31.0

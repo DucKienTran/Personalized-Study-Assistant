@@ -55,6 +55,12 @@ class Notebook(Base):
         back_populates="notebook",
         cascade="all, delete-orphan",
     )
+    mindmaps = relationship(
+        "Mindmap", back_populates="notebook", cascade="all, delete-orphan"
+    )
+    flashcard_decks = relationship(
+        "FlashcardDeck", back_populates="notebook", cascade="all, delete-orphan"
+    )
 
 
 class NotebookDocument(Base):
@@ -120,3 +126,24 @@ class NotebookSummary(Base):
     )
 
     notebook = relationship("Notebook", back_populates="summaries")
+
+
+class Mindmap(Base):
+    __tablename__ = "mindmaps"
+
+    id = Column(BIGINT(unsigned=True), primary_key=True, index=True, autoincrement=True)
+    notebook_id = Column(
+        BIGINT(unsigned=True),
+        ForeignKey("notebooks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = Column(String(255), nullable=False)
+    content_json = Column(JSON, nullable=False)
+    source_document_ids = Column(JSON, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    notebook = relationship("Notebook", back_populates="mindmaps")

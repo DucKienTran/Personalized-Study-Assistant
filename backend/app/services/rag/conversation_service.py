@@ -1,13 +1,15 @@
 # app/services/conversation_service.py
 
-import logging
 from datetime import datetime, timezone
+import logging
 
 from sqlalchemy.orm import Session
 
 from app.models.conversation_model import Conversation, Message
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CONVERSATION_TITLE = "New chat"
 
 
 class ConversationService:
@@ -81,6 +83,21 @@ class ConversationService:
             .all()
         )
 
+    def has_user_messages(
+        self,
+        db: Session,
+        conversation_id: int,
+    ) -> bool:
+        return (
+            db.query(Message.id)
+            .filter(
+                Message.conversation_id == conversation_id,
+                Message.sender == "user",
+            )
+            .first()
+            is not None
+        )
+
     def add_message(
         self,
         db: Session,
@@ -88,12 +105,14 @@ class ConversationService:
         sender: str,
         content: str,
         sources_json: str | None = None,
+        resource_json: str | None = None,
     ) -> Message:
         msg = Message(
             conversation_id=conversation_id,
             sender=sender,
             content=content,
             sources_json=sources_json,
+            resource_json=resource_json,
         )
 
         db.add(msg)
@@ -136,6 +155,26 @@ class ConversationService:
         db.refresh(conv)
 
         return conv
+
+    def update_title_if_default(
+        self,
+        db: Session,
+        user_id: int,
+        conversation_id: int,
+        title: str,
+    ) -> Conversation | None:
+        (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+                Conversation.title == DEFAULT_CONVERSATION_TITLE,
+            )
+            .update({Conversation.title: title[:255]}, synchronize_session=False)
+        )
+        db.commit()
+        db.expire_all()
+        return self.get_conversation(db, user_id, conversation_id)
 
     def delete_conversation(
         self,
