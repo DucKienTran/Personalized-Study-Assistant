@@ -7,6 +7,8 @@ import {
 } from "@/types/chat";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { CitationCard } from "./citation-card";
+import { AssistantResourceCard } from "./assistant-resource-card";
+import { AssistantThinkingText } from "./assistant-thinking-text";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -87,19 +89,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         <div className={isUser ? "px-4 py-3" : "min-w-0 max-w-full"}>
           {isThinking ? (
             <p className="text-sm italic text-muted-foreground">
-              {THINKING_MESSAGES[thinkingIndex]
-                .split("")
-                .map((char, index) => (
-                  <span
-                    key={index}
-                    className="thinking-char"
-                    style={{
-                      animationDelay: `${index * 80}ms`,
-                    }}
-                  >
-                    {char === " " ? "\u00A0" : char}
-                  </span>
-                ))}
+              <AssistantThinkingText>
+                {THINKING_MESSAGES[thinkingIndex]}
+              </AssistantThinkingText>
             </p>
           ) : (
             <MarkdownRenderer
@@ -108,6 +100,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             />
           )}
         </div>
+
+        {!isUser && message.resource && (
+          <AssistantResourceCard resource={message.resource} />
+        )}
 
         {hasSources && (
           <div className="mt-6 min-w-0 max-w-full">

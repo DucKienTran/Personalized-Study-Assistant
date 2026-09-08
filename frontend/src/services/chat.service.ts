@@ -4,6 +4,7 @@ import {
   RAGQueryRequest,
   RetrievalMetadata
 } from "@/types/chat";
+import type { AssistantResource } from "@/types/assistant-resource";
 
 interface BackendCitationSource {
   index: number;
@@ -20,10 +21,13 @@ export type CitationMap = Record<string, number>;
 
 export interface StreamCallbacks {
   onConversationId?: (id: number) => void;
+  onConversationUpdated?: (conversation: ConversationSummary) => void;
   onCitationMap?: (map: Record<string, number>) => void;
   onSources?: (
     sources: CitationSource[]
   ) => void;
+
+  onResource?: (resource: AssistantResource) => void;
 
   onToken?: (
     token: string
@@ -92,6 +96,7 @@ class ChatService {
         sender: m.sender,
         content: m.content,
         sourcesJson: m.sources_json,
+        resourceJson: m.resource_json,
         createdAt: m.created_at,
       })),
     };
@@ -236,6 +241,15 @@ class ChatService {
                 callbacks.onConversationId?.(parsed.id);
                 break;
               }
+              case "conversation_updated": {
+                const parsed = JSON.parse(rawData);
+                callbacks.onConversationUpdated?.({
+                  id: parsed.id,
+                  title: parsed.title,
+                  updatedAt: parsed.updated_at,
+                });
+                break;
+              }
               case "citation_map": {
                 const parsed = JSON.parse(rawData);
                 const rawMap: Record<string, number> =
@@ -258,6 +272,12 @@ class ChatService {
                   )
                 );
 
+                break;
+              }
+
+              case "resource": {
+                const parsed = JSON.parse(rawData);
+                callbacks.onResource?.(parsed.data || parsed);
                 break;
               }
 

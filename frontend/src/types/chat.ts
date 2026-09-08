@@ -1,4 +1,6 @@
 
+import type { AssistantResource } from "@/types/assistant-resource";
+
 export type MessageSender = "user" | "ai";
 
 
@@ -98,6 +100,8 @@ export interface ChatMessage {
 
   sources?: CitationSource[];
 
+  resource?: AssistantResource;
+
   /**
    * Metadata từ RAG pipeline
    */
@@ -124,6 +128,7 @@ export interface ConversationDetailMessage {
   sender: MessageSender;
   content: string;
   sourcesJson?: string | null;
+  resourceJson?: string | null;
   createdAt: string;
 }
 

@@ -2,13 +2,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import axios from "axios";
+import { AccessNotFound } from "@/components/shared/AccessNotFound";
 import { Icon } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import { notebookService } from "@/services/notebook.service";
-import {
-  SummaryLevel,
-  SummaryFormat,
-} from "@/services/summary.service";
 import { NotebookDetailOut } from "@/types/notebook";
 import { NotebookSidebar } from "@/components/notebooks/NotebookSidebar";
 import { AddDocumentModal } from "@/components/notebooks/AddDocumentModal";
@@ -16,6 +14,8 @@ import { CreateNotebookModal } from "@/components/notebooks/CreateNotebookModal"
 import { AssistantTab } from "@/components/notebooks/AssistantTab";
 import { SummaryTab } from "@/components/notebooks/SummaryTab";
 import { QuizzesTab } from "@/components/notebooks/QuizzesTab";
+import { MindmapTab } from "@/components/notebooks/MindmapTab";
+import { FlashcardsTab } from "@/components/flashcards/FlashcardsTab";
 import { usePdfViewer } from "@/contexts/pdf-viewer-context";
 import { AssistantSendRequest } from "@/types/chat";
 
@@ -31,13 +31,23 @@ export default function NotebookDetailPage() {
   const [notebook, setNotebook] = useState<NotebookDetailOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessNotFound, setAccessNotFound] = useState(false);
 
   // Tab State
   const requestedTab = searchParams.get("tab");
-  const activeTab = ["assistant", "summary", "quizzes"].includes(
-    requestedTab ?? ""
-  )
-    ? (requestedTab as "assistant" | "summary" | "quizzes")
+  const activeTab = [
+    "assistant",
+    "summary",
+    "quizzes",
+    "flashcards",
+    "mindmap",
+  ].includes(requestedTab ?? "")
+    ? (requestedTab as
+        | "assistant"
+        | "summary"
+        | "quizzes"
+        | "flashcards"
+        | "mindmap")
     : "assistant";
   const requestedQuizId = Number(searchParams.get("quizId"));
   const selectedQuizId =
@@ -45,6 +55,19 @@ export default function NotebookDetailPage() {
     requestedQuizId > 0
       ? requestedQuizId
       : null;
+  const requestedSummaryId = Number(searchParams.get("summaryId"));
+  const selectedSummaryId = Number.isInteger(requestedSummaryId) && requestedSummaryId > 0
+    ? requestedSummaryId
+    : null;
+  const requestedMindmapId = Number(searchParams.get("mindmapId"));
+  const selectedMindmapId = Number.isInteger(requestedMindmapId) && requestedMindmapId > 0
+    ? requestedMindmapId
+    : null;
+  const requestedDeckId = Number(searchParams.get("deckId"));
+  const selectedDeckId = Number.isInteger(requestedDeckId) && requestedDeckId > 0
+    ? requestedDeckId
+    : null;
+  const startSelectedDeckStudy = searchParams.get("study") === "1";
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
   const [isEditNotebookModalOpen, setIsEditNotebookModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -61,13 +84,6 @@ export default function NotebookDetailPage() {
     previousPdfViewerOpenRef.current = isPdfViewerOpen;
   }, [isPdfViewerOpen]);
 
-  // Summary Persistent State
-  const [summaryText, setSummaryText] = useState("");
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [summaryLevel, setSummaryLevel] = useState<SummaryLevel>("standard");
-  const [summaryFormat, setSummaryFormat] = useState<SummaryFormat>("markdown");
-  const [summaryInstruction, setSummaryInstruction] = useState("");
-
   const replaceWorkspaceQuery = (nextParams: URLSearchParams) => {
     const queryString = nextParams.toString();
     router.replace(
@@ -77,7 +93,7 @@ export default function NotebookDetailPage() {
   };
 
   const handleTabChange = (
-    tab: "assistant" | "summary" | "quizzes"
+    tab: "assistant" | "summary" | "quizzes" | "flashcards" | "mindmap"
   ) => {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("tab", tab);
@@ -95,6 +111,14 @@ export default function NotebookDetailPage() {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("tab", "quizzes");
     nextParams.delete("quizId");
+    replaceWorkspaceQuery(nextParams);
+  };
+
+  const handleCloseResource = (
+    parameter: "summaryId" | "mindmapId" | "deckId"
+  ) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete(parameter);
     replaceWorkspaceQuery(nextParams);
   };
 
@@ -137,9 +161,9 @@ export default function NotebookDetailPage() {
         });
       }
     } catch (activationError) {
-      console.error("Failed to activate quiz source documents:", activationError);
+      console.error("Failed to activate source documents:", activationError);
       await fetchDetail();
-      alert("The quiz source documents could not be activated. Please try again.");
+      alert("The source documents could not be activated. Please try again.");
       return;
     }
 
@@ -150,23 +174,36 @@ export default function NotebookDetailPage() {
   };
 
   const fetchDetail = async () => {
+    if (!Number.isInteger(notebookId) || notebookId <= 0) {
+      setAccessNotFound(true);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      setAccessNotFound(false);
       const data = await notebookService.getNotebookDetail(notebookId);
+      if (!data) {
+        setAccessNotFound(true);
+        return;
+      }
       setNotebook(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load notebook detail:", err);
-      setError("Failed to load notebook detail. Please try again.");
+      if (axios.isAxiosError(err) && (err.response?.status === 403 || err.response?.status === 404)) {
+        setAccessNotFound(true);
+      } else {
+        setError("Failed to load notebook detail. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (notebookId) {
-      fetchDetail();
-    }
+    void fetchDetail();
   }, [notebookId]);
 
   const hasProcessingDocument = notebook?.documents.some(({ document }) =>
@@ -256,6 +293,10 @@ export default function NotebookDetailPage() {
     );
   }
 
+  if (accessNotFound) {
+    return <AccessNotFound />;
+  }
+
   if (error || !notebook) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center">
@@ -319,16 +360,7 @@ export default function NotebookDetailPage() {
             <SummaryTab
               notebookId={notebookId}
               activeDocumentCount={notebook.active_document_count}
-              summaryText={summaryText}
-              setSummaryText={setSummaryText}
-              isGenerating={isGeneratingSummary}
-              setIsGenerating={setIsGeneratingSummary}
-              level={summaryLevel}
-              setLevel={setSummaryLevel}
-              format={summaryFormat}
-              setFormat={setSummaryFormat}
-              instruction={summaryInstruction}
-              setInstruction={setSummaryInstruction}
+              selectedSummaryId={selectedSummaryId}
             />
           )}
 
@@ -357,6 +389,35 @@ export default function NotebookDetailPage() {
                 }
               />
             </div>
+          )}
+
+          {/* TAB 4: FLASHCARDS */}
+          {activeTab === "flashcards" && (
+            <FlashcardsTab
+              notebookId={notebookId}
+              activeDocumentCount={notebook.active_document_count}
+              onExplainCard={handleExplainQuestion}
+              selectedDeckId={selectedDeckId}
+              startSelectedDeckStudy={startSelectedDeckStudy}
+              onSelectDeck={(deckId) => {
+                const nextParams = new URLSearchParams(searchParams.toString());
+                nextParams.set("tab", "flashcards");
+                nextParams.set("deckId", String(deckId));
+                replaceWorkspaceQuery(nextParams);
+              }}
+              onCloseDeck={() => handleCloseResource("deckId")}
+            />
+          )}
+
+          {/* TAB 5: MINDMAP */}
+          {activeTab === "mindmap" && (
+            <MindmapTab
+              notebookId={notebookId}
+              eligibleDocumentCount={notebook.documents.filter(
+                ({ document, is_active }) => is_active && document.status === "completed"
+              ).length}
+              selectedMindmapId={selectedMindmapId}
+            />
           )}
 
         </main>

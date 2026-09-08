@@ -18,8 +18,10 @@ import { NotebookDetailOut } from "@/types/notebook";
 
 interface NotebookSidebarProps {
   notebook: NotebookDetailOut;
-  activeTab: "assistant" | "summary" | "quizzes";
-  onTabChange: (tab: "assistant" | "summary" | "quizzes") => void;
+  activeTab: "assistant" | "summary" | "quizzes" | "flashcards" | "mindmap";
+  onTabChange: (
+    tab: "assistant" | "summary" | "quizzes" | "flashcards" | "mindmap"
+  ) => void;
   onOpenAddModal: () => void;
   onEditNotebook: () => void;
   onClose: () => void;
@@ -72,6 +74,8 @@ export function NotebookSidebar({
     { value: "assistant", label: "Assistant", icon: "forum" },
     { value: "summary", label: "Summary", icon: "summarize" },
     { value: "quizzes", label: "Quizzes", icon: "quiz" },
+    { value: "flashcards", label: "Flashcards", icon: "style" },
+    { value: "mindmap", label: "Mindmap", icon: "account_tree" },
   ] as const;
 
   if (isCollapsed) {

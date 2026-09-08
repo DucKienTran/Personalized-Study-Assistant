@@ -47,6 +47,22 @@ export function AssistantTab({
     }
   }, [notebookId]);
 
+  const handleConversationUpdated = useCallback(
+    (updated?: ConversationSummary) => {
+      if (!updated) {
+        void refreshConversations();
+        return;
+      }
+
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === updated.id ? updated : conversation
+        )
+      );
+    },
+    [refreshConversations]
+  );
+
   const {
     messages,
     isLoading,
@@ -58,7 +74,7 @@ export function AssistantTab({
     loadConversation,
     initializeLatestConversation,
     startNewConversation,
-  } = useChat({ notebookId, onConversationUpdated: refreshConversations });
+  } = useChat({ notebookId, onConversationUpdated: handleConversationUpdated });
   const chatInputRef = useRef<ChatInputHandle>(null);
   const initializedNotebookRef = useRef<number | null>(null);
   const handledAutoSendRef = useRef<string | null>(null);

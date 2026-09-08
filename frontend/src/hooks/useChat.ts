@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { ChatMessage } from "@/types/chat";
+import { ChatMessage, ConversationSummary } from "@/types/chat";
 import { chatService, mapCitationSource } from "@/services/chat.service";
 import { remapCitations } from "@/utils/citations";
 
@@ -12,7 +12,7 @@ export type ChatError = {
 
 interface UseChatOptions {
   notebookId: number;
-  onConversationUpdated?: () => void;
+  onConversationUpdated?: (conversation?: ConversationSummary) => void;
 }
 
 export function useChat({
@@ -33,6 +33,7 @@ export function useChat({
     (conversation: Awaited<ReturnType<typeof chatService.getConversation>>) =>
       conversation.messages.map((message): ChatMessage => {
         let sources: ChatMessage["sources"];
+        let resource: ChatMessage["resource"];
         if (message.sourcesJson) {
           try {
             sources = JSON.parse(message.sourcesJson).map(mapCitationSource);
@@ -40,11 +41,19 @@ export function useChat({
             sources = undefined;
           }
         }
+        if (message.resourceJson) {
+          try {
+            resource = JSON.parse(message.resourceJson);
+          } catch {
+            resource = undefined;
+          }
+        }
         return {
           id: String(message.id),
           sender: message.sender,
           content: message.content,
           sources,
+          resource,
           createdAt: message.createdAt,
           isStreaming: false,
         };
@@ -111,6 +120,7 @@ export function useChat({
       };
 
       try {
+        let receivedConversationUpdate = false;
         await chatService.streamQuestion(
           {
             query: trimmedContent,
@@ -122,6 +132,11 @@ export function useChat({
           {
             onConversationId: (id) => {
               setConversationId(id);
+            },
+
+            onConversationUpdated: (conversation) => {
+              receivedConversationUpdate = true;
+              onConversationUpdated?.(conversation);
             },
 
             onMetadata: (metadata) => {
@@ -173,6 +188,16 @@ export function useChat({
               );
             },
 
+            onResource: (resource) => {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === aiMessageId
+                    ? { ...message, resource }
+                    : message
+                )
+              );
+            },
+
             onDone: () => {
               setMessages((prev) =>
                 prev.map((message) =>
@@ -185,7 +210,9 @@ export function useChat({
                 )
               );
 
-              onConversationUpdated?.();
+              if (!receivedConversationUpdate) {
+                onConversationUpdated?.();
+              }
             },
 
             onError: (errorMessage) => {
