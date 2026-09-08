@@ -98,6 +98,13 @@ class Quiz(Base):
 
     error_message = Column(Text, nullable=True)
 
+    auto_feedback_status = Column(
+        String(16),
+        nullable=False,
+        default="pending",
+        server_default="pending",
+    )  # pending | shown | skipped
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

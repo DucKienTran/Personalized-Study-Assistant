@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import QuizQuestionCard from "@/components/quizzes/QuizQuestionCard";
+import { AccessNotFound } from "@/components/shared/AccessNotFound";
 import { Icon } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +54,7 @@ interface QuizQuestion {
 
 interface QuizDetails {
   id: number;
+  notebook_id: number;
   title: string;
   mode: "study" | "exam";
   total_questions: number;
@@ -63,7 +66,9 @@ interface QuizDetails {
 
 interface QuizRunnerProps {
   quizId: number;
+  attemptId?: number | null;
   onBack: () => void;
+  onNotebookIdResolved?: (notebookId: number) => void;
   onExplainQuestion?: (content: string, sourceDocumentIds: number[]) => void | Promise<void>;
 }
 
@@ -165,7 +170,9 @@ Please help me understand ${correct ? "why this answer is correct" : "why my ans
 
 export default function QuizRunner({
   quizId,
+  attemptId,
   onBack,
+  onNotebookIdResolved,
   onExplainQuestion,
 }: QuizRunnerProps) {
   const router = useRouter();
@@ -180,12 +187,14 @@ export default function QuizRunner({
   const [examResult, setExamResult] = useState<any>(null);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [autoFeedbackPending, setAutoFeedbackPending] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState<FeedbackTag[]>([]);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [accessNotFound, setAccessNotFound] = useState(false);
 
   useEffect(() => {
     if (!notice) return;
@@ -194,9 +203,19 @@ export default function QuizRunner({
   }, [notice]);
 
   useEffect(() => {
+    if (!autoFeedbackPending) return;
+    const timer = window.setTimeout(() => {
+      setFeedbackError(null);
+      setShowFeedbackDialog(true);
+      setAutoFeedbackPending(false);
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [autoFeedbackPending]);
+
+  useEffect(() => {
     async function loadQuizData() {
       if (!Number.isFinite(quizId) || quizId <= 0) {
-        setPageError("This quiz link is invalid.");
+        setAccessNotFound(true);
         setLoading(false);
         return;
       }
@@ -204,8 +223,13 @@ export default function QuizRunner({
       try {
         setLoading(true);
         setPageError(null);
+        setAccessNotFound(false);
         const response = await api.get(`/quizzes/${quizId}`);
         let quizData = response.data.data;
+        if (!quizData) {
+          setAccessNotFound(true);
+          return;
+        }
 
         if (quizData?.mode === "study") {
           await api.post(`/quizzes/${quizId}/attempts/start`);
@@ -223,7 +247,8 @@ export default function QuizRunner({
                 const rightTime = Date.parse(right.submitted_at ?? right.created_at);
                 const leftTime = Date.parse(left.submitted_at ?? left.created_at);
                 return rightTime - leftTime;
-              })[0];
+              })
+              .find((attempt) => attemptId == null || attempt.id === attemptId);
 
             if (latestCompleted) {
               const detailResponse = await api.get(
@@ -258,6 +283,7 @@ export default function QuizRunner({
         }
 
         setQuiz(quizData);
+        onNotebookIdResolved?.(quizData.notebook_id);
 
         const initialAnswers: Record<number, AnswerValue> = {};
         quizData?.questions?.forEach((question: QuizQuestion) => {
@@ -268,14 +294,18 @@ export default function QuizRunner({
         setAnswers(initialAnswers);
       } catch (error) {
         console.error("Failed to load quiz:", error);
-        setPageError("We could not load this quiz. Please try again.");
+        if (axios.isAxiosError(error) && (error.response?.status === 403 || error.response?.status === 404)) {
+          setAccessNotFound(true);
+        } else {
+          setPageError("We could not load this quiz. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
     }
 
     loadQuizData();
-  }, [quizId, reloadKey]);
+  }, [attemptId, onNotebookIdResolved, quizId, reloadKey]);
 
   if (loading) {
     return (
@@ -301,6 +331,10 @@ export default function QuizRunner({
         </div>
       </div>
     );
+  }
+
+  if (accessNotFound) {
+    return <AccessNotFound />;
   }
 
   if (pageError || !quiz) {
@@ -403,6 +437,9 @@ export default function QuizRunner({
       if (nextAnsweredCount === totalCount) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+      if (result.show_auto_feedback === true) {
+        setAutoFeedbackPending(true);
+      }
     } catch (error) {
       console.error("Failed to save answer:", error);
       setAnswers((currentAnswers) => {
@@ -497,6 +534,9 @@ export default function QuizRunner({
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
       setNotice({ message: "Exam submitted successfully.", tone: "success" });
+      if (result.show_auto_feedback === true) {
+        setAutoFeedbackPending(true);
+      }
     } catch (error) {
       console.error("Failed to submit exam:", error);
       setNotice({ message: "The exam could not be submitted.", tone: "danger" });

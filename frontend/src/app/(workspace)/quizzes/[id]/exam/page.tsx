@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import api from "@/services/api";
 import QuizQuestionCard from "@/components/quizzes/QuizQuestionCard";
 import ExamSidebar from "@/components/quizzes/ExamSidebar";
 import { useToast, ToastContainer } from "@/components/shared/Toast";
 import ConfirmButton from "@/components/shared/ConfirmButton";
+import { AccessNotFound } from "@/components/shared/AccessNotFound";
 import { Icon } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +64,7 @@ export default function QuizDoingPage({ params }: Props) {
     const [answers, setAnswers] = useState<Record<number, unknown>>({});
     const [submitting, setSubmitting] = useState(false);
     const [examResult, setExamResult] = useState<any>(null);
+    const [accessNotFound, setAccessNotFound] = useState(false);
 
     // QUẢN LÝ RIÊNG CHO EXAM MODE (SINGLE-QUESTION VÀ MARKING)
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -102,10 +105,21 @@ export default function QuizDoingPage({ params }: Props) {
     // 1. Tải thông tin bài làm / phòng thi từ API
     useEffect(() => {
         async function loadQuizData() {
+            if (!Number.isInteger(quizId) || quizId <= 0) {
+                setAccessNotFound(true);
+                setLoading(false);
+                return;
+            }
+
             try {
                 setLoading(true);
+                setAccessNotFound(false);
                 let res = await api.get(`/quizzes/${quizId}`);
                 let quizData = res.data.data;
+                if (!quizData) {
+                    setAccessNotFound(true);
+                    return;
+                }
 
                 if (quizData?.mode === "exam") {
                     await api.post(`/quizzes/${quizId}/attempts/start`);
@@ -128,13 +142,16 @@ export default function QuizDoingPage({ params }: Props) {
                 }
             } catch (err) {
                 console.error("Lỗi khi tải chi tiết bài làm:", err);
-                alert("Không thể tải thông tin phòng học.");
-                router.push("/quizzes");
+                if (axios.isAxiosError(err) && (err.response?.status === 403 || err.response?.status === 404)) {
+                    setAccessNotFound(true);
+                } else {
+                    alert("Không thể tải thông tin phòng học.");
+                }
             } finally {
                 setLoading(false);
             }
         }
-        if (quizId) loadQuizData();
+        void loadQuizData();
     }, [quizId, router]);
 
     // 2. Bộ đếm ngược thời gian làm bài (Chỉ kích hoạt ở Exam Mode)
@@ -347,6 +364,8 @@ export default function QuizDoingPage({ params }: Props) {
             </div>
         );
     }
+
+    if (accessNotFound) return <AccessNotFound />;
 
     if (!quiz) return null;
 
@@ -565,7 +584,7 @@ export default function QuizDoingPage({ params }: Props) {
                     
                     {isSubmitted ? (
                         <button
-                            onClick={() => router.push("/quizzes")}
+                            onClick={() => router.push(`/notebooks/${quiz.notebook_id}?tab=quizzes`)}
                             className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive active:bg-destructive/20"
                         >
                             Leave exam

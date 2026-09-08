@@ -1,7 +1,7 @@
 "use client";
 
-import { use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { use, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import QuizRunner from "@/components/quizzes/QuizRunner";
 
@@ -11,18 +11,20 @@ interface Props {
 
 export default function QuizDoingPage({ params }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { id } = use(params);
   const quizId = Number(id);
-  const notebookId = Number(searchParams.get("notebookId"));
-  const returnPath = Number.isFinite(notebookId) && notebookId > 0
-    ? `/notebooks/${notebookId}?tab=quizzes`
-    : "/quizzes";
+  const [notebookId, setNotebookId] = useState<number | null>(null);
+  const handleBackToList = useCallback(() => {
+    if (notebookId !== null) {
+      router.push(`/notebooks/${notebookId}?tab=quizzes`);
+    }
+  }, [notebookId, router]);
 
   return (
     <QuizRunner
       quizId={quizId}
-      onBack={() => router.push(returnPath)}
+      onBack={handleBackToList}
+      onNotebookIdResolved={setNotebookId}
     />
   );
 }

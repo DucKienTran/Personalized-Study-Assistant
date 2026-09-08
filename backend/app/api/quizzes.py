@@ -120,6 +120,20 @@ def get_processing_quizzes(
 
 
 @router.get(
+    "/exam-history",
+    response_model=BaseResponse[List[Dict[str, Any]]],
+)
+def get_exam_history(
+    current_user: CurrentUserDep,
+    quiz_service: QuizServiceDep,
+    notebook_id: int | None = None,
+):
+    return BaseResponse(
+        data=quiz_service.get_exam_history(current_user.id, notebook_id)
+    )
+
+
+@router.get(
     "/{quiz_id}",
     response_model=BaseResponse[Dict[str, Any]],
 )

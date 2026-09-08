@@ -90,6 +90,29 @@ export interface QuizItem {
     created_at: string;
 }
 
+export interface QuizDetail {
+    id: number;
+    notebook_id: number;
+    title: string;
+    mode: QuizMode;
+    total_questions: number;
+    time_limit_minutes?: number | null;
+    generation_status: GenerationStatus;
+    error_message?: string | null;
+}
+
+interface QuizDetailResponse extends Omit<QuizDetail, "total_questions"> {
+    total_questions?: number;
+    questions?: unknown[];
+}
+
+export interface ExamHistoryItem extends QuizItem {
+    attempt_id: number;
+    score: number | null;
+    submitted_at: string | null;
+    duration_seconds: number | null;
+}
+
 /* =========================
  * Processing Banner
  * ========================= */
@@ -156,6 +179,15 @@ export interface QuestionHint {
  * ========================= */
 
 export const quizService = {
+    async getQuiz(quizId: number) {
+        const res = await api.get<ApiResponse<QuizDetailResponse>>(`/quizzes/${quizId}`);
+        const quiz = res.data.data;
+        return {
+            ...quiz,
+            total_questions: quiz.total_questions ?? quiz.questions?.length ?? 0,
+        } satisfies QuizDetail;
+    },
+
     /**
      * Danh sách quiz của user
      */
@@ -192,6 +224,14 @@ export const quizService = {
             payload
         );
 
+        return res.data.data;
+    },
+
+    async listExamHistory(notebookId: number) {
+        const res = await api.get<ApiResponse<ExamHistoryItem[]>>(
+            "/quizzes/exam-history",
+            { params: { notebook_id: notebookId } }
+        );
         return res.data.data;
     },
 

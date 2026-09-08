@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Difficulty,
+  ExamHistoryItem,
   GenerateQuizPayload,
   QuizItem,
   QuizMode,
@@ -96,6 +97,13 @@ function getErrorMessage(error: unknown): string {
   return "Unable to create the quiz. Please try again.";
 }
 
+function getHistoryErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.detail || "Unable to load exam history. Please try again.";
+  }
+  return "Unable to load exam history. Please try again.";
+}
+
 function statusLabel(quiz: QuizItem): string {
   if (quiz.derived_status === "processing") return "Generating";
   if (quiz.derived_status === "failed") return "Generation failed";
@@ -148,6 +156,11 @@ function formatQuizDate(value: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatScore(value: number | null): string {
+  if (value === null) return "No score";
+  return `${Math.round((value + Number.EPSILON) * 100) / 100} points`;
 }
 
 function getQuestionCountError(value: string): string | null {
@@ -204,6 +217,11 @@ export function QuizzesTab({
   const [isSearchPending, setIsSearchPending] = useState(false);
   const [deletingQuizId, setDeletingQuizId] = useState<number | null>(null);
   const [pendingExam, setPendingExam] = useState<QuizItem | null>(null);
+  const [showExamHistory, setShowExamHistory] = useState(false);
+  const [examHistory, setExamHistory] = useState<ExamHistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedAttemptId, setSelectedAttemptId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -263,6 +281,11 @@ export function QuizzesTab({
         normalizeSearchText(quiz.title).includes(normalizedKeyword)
       )
     : quizzes;
+  const filteredHistory = normalizedKeyword
+    ? examHistory.filter((item) =>
+        normalizeSearchText(item.title).includes(normalizedKeyword)
+      )
+    : examHistory;
 
   const questionCountError = getQuestionCountError(totalQuestions);
   const timeLimitError =
@@ -363,14 +386,36 @@ export function QuizzesTab({
     onSelectQuiz(quiz.id);
   };
 
+  const openExamHistory = async () => {
+    setShowExamHistory(true);
+    setSearchInput("");
+    setSearchKeyword("");
+    setIsHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      setExamHistory(await quizService.listExamHistory(notebookId));
+    } catch (loadError) {
+      setHistoryError(getHistoryErrorMessage(loadError));
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const handleOpenHistoryItem = (item: ExamHistoryItem) => {
+    setSelectedAttemptId(item.attempt_id);
+    onSelectQuiz(item.id);
+  };
+
   if (selectedQuizId !== null) {
     return (
       <QuizRunner
         key={selectedQuizId}
         quizId={selectedQuizId}
+        attemptId={selectedAttemptId}
         onExplainQuestion={onExplainQuestion}
         onBack={() => {
-          onCloseQuiz();
+            onCloseQuiz();
+            setSelectedAttemptId(null);
           quizService.listQuizzes(notebookId).then(setQuizzes).catch(() => undefined);
         }}
       />
@@ -389,9 +434,9 @@ export function QuizzesTab({
             type="search"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search quizzes..."
+            placeholder={showExamHistory ? "Search exam history..." : "Search quizzes..."}
             className="h-8 w-full pl-9 pr-9 text-xs"
-            aria-label="Search quizzes"
+            aria-label={showExamHistory ? "Search exam history" : "Search quizzes"}
           />
           {isSearchPending && (
             <Icon
@@ -401,7 +446,19 @@ export function QuizzesTab({
           )}
         </div>
 
-        <span
+        {!showExamHistory && <Button
+          type="button"
+          variant="secondary"
+          size="icon-sm"
+          className="rounded-[8px]"
+          title="Exam history"
+          aria-label="Exam history"
+          onClick={openExamHistory}
+        >
+          <Icon name="history" className="text-base" />
+        </Button>}
+
+        {!showExamHistory && <span
           className="inline-flex"
           title={hasActiveDocuments ? undefined : noActiveDocumentsHint}
         >
@@ -414,7 +471,7 @@ export function QuizzesTab({
             <Icon name="add" className="text-base" />
             Create Quiz
           </Button>
-        </span>
+        </span>}
       </div>
 
       {error && !isDialogOpen && (
@@ -425,7 +482,41 @@ export function QuizzesTab({
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {isLoading ? (
+        {showExamHistory && (
+          <div className="mb-5 flex items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              title="Back to quizzes"
+              aria-label="Back to quizzes"
+              onClick={() => {
+                setShowExamHistory(false);
+                setSearchInput("");
+                setSearchKeyword("");
+              }}
+            >
+              <Icon name="arrow_back" className="text-base" />
+            </Button>
+            <h2 className="font-heading text-lg font-semibold">Exam History</h2>
+          </div>
+        )}
+        {showExamHistory && isHistoryLoading ? (
+          <div className="flex h-full min-h-80 items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Icon name="progress_activity" className="animate-spin text-lg" />
+            Loading exam history...
+          </div>
+        ) : showExamHistory && historyError ? (
+          <div className="rounded-[8px] border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {historyError}
+          </div>
+        ) : showExamHistory && examHistory.length === 0 ? (
+          <div className="flex h-full min-h-80 flex-col items-center justify-center text-center">
+            <Icon name="history" className="text-3xl text-muted-foreground" />
+            <h3 className="mt-3 font-heading text-lg font-semibold">No exam history yet</h3>
+            <p className="mt-2 text-xs text-muted-foreground">Completed exams will appear here.</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex h-full min-h-80 items-center justify-center gap-2 text-xs text-muted-foreground">
             <Icon name="progress_activity" className="animate-spin text-lg" />
             Loading quizzes...
@@ -462,16 +553,19 @@ export function QuizzesTab({
               <div className="pointer-events-none absolute inset-0 z-10 rounded-xl bg-background/35" />
             )}
 
-            {filteredQuizzes.length === 0 ? (
+            {(showExamHistory ? filteredHistory : filteredQuizzes).length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
                 <Icon name="search_off" className="text-3xl text-muted-foreground" />
                 <p className="mt-3 text-sm font-medium text-foreground">
-                  No quizzes match your search
+                  {showExamHistory
+                    ? "No exam history matches your search"
+                    : "No quizzes match your search"}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3">
-                {filteredQuizzes.map((quiz) => {
+                {(showExamHistory ? filteredHistory : filteredQuizzes).map((quiz) => {
+                  const historyItem = showExamHistory ? quiz as ExamHistoryItem : null;
                   const canOpen = ["todo", "in_progress", "completed"].includes(
                     quiz.derived_status
                   );
@@ -480,7 +574,7 @@ export function QuizzesTab({
 
                   return (
                     <div
-                      key={quiz.id}
+                      key={historyItem ? historyItem.attempt_id : quiz.id}
                       className={`group rounded-[10px] border border-border/80 bg-card p-4 shadow-2xs transition-[border-color,box-shadow] ${
                         canOpen ? "hover:border-primary/40 hover:shadow-xs" : ""
                       } ${isPending ? "opacity-65" : ""}`}
@@ -489,7 +583,7 @@ export function QuizzesTab({
                         <button
                           type="button"
                           disabled={!canOpen || isDeleting}
-                          onClick={() => handleOpenQuiz(quiz)}
+                          onClick={() => historyItem ? handleOpenHistoryItem(historyItem) : handleOpenQuiz(quiz)}
                           className="flex min-w-0 flex-1 items-center gap-4 text-left disabled:cursor-default"
                           aria-label={canOpen ? `Open ${quiz.title}` : undefined}
                         >
@@ -514,9 +608,19 @@ export function QuizzesTab({
                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                           <span>{quiz.total_questions} questions</span>
                           <span aria-hidden>·</span>
-                          <span>{difficultyLabel(quiz)}</span>
-                          <span aria-hidden>·</span>
-                          <span>{formatQuizDate(quiz.created_at)}</span>
+                          {historyItem ? (
+                            <>
+                              <span>{formatQuizDate(historyItem.submitted_at ?? historyItem.created_at)}</span>
+                              <span aria-hidden>·</span>
+                              <span>{formatScore(historyItem.score)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{difficultyLabel(quiz)}</span>
+                              <span aria-hidden>·</span>
+                              <span>{formatQuizDate(quiz.created_at)}</span>
+                            </>
+                          )}
                         </div>
                         {quiz.error_message && (
                           <p className="mt-2 line-clamp-1 text-[11px] text-destructive">
@@ -526,7 +630,7 @@ export function QuizzesTab({
                       </div>
                         </button>
 
-                        <div className="flex shrink-0 items-center gap-1.5">
+                        {!historyItem && <div className="flex shrink-0 items-center gap-1.5">
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               disabled={isDeleting}
@@ -564,7 +668,7 @@ export function QuizzesTab({
                             )}
                             {statusLabel(quiz)}
                           </span>
-                        </div>
+                        </div>}
                       </div>
                     </div>
                   );

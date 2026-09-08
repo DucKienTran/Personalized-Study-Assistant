@@ -16,6 +16,7 @@ from app.schemas.quiz_schema import QuizGenerateRequest
 from app.services.quiz.quiz_pipeline import QuizPipeline, QuizPipelineResult
 
 logger = logging.getLogger(__name__)
+AUTO_FEEDBACK_PROBABILITY = 0.35
 
 
 class QuizService:
@@ -499,6 +500,46 @@ class QuizService:
             for a in attempts
         ]
 
+    def get_exam_history(
+        self, user_id: int, notebook_id: int | None = None
+    ) -> List[Dict[str, Any]]:
+        query = (
+            self.db.query(QuizAttempt, Quiz)
+            .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
+            .filter(
+                QuizAttempt.user_id == user_id,
+                Quiz.user_id == user_id,
+                Quiz.mode == "exam",
+                QuizAttempt.attempt_status == "completed",
+            )
+        )
+        if notebook_id is not None:
+            query = query.filter(Quiz.notebook_id == notebook_id)
+
+        rows = query.order_by(
+            desc(QuizAttempt.submitted_at), desc(QuizAttempt.created_at)
+        ).all()
+        return [
+            {
+                "id": quiz.id,
+                "notebook_id": quiz.notebook_id,
+                "title": quiz.title,
+                "mode": quiz.mode,
+                "total_questions": quiz.total_questions,
+                "time_limit_minutes": quiz.time_limit_minutes,
+                "generation_strategy": quiz.generation_strategy,
+                "difficulty_distribution": quiz.difficulty_distribution,
+                "generation_status": quiz.generation_status,
+                "derived_status": "completed",
+                "created_at": quiz.created_at,
+                "attempt_id": attempt.id,
+                "score": float(attempt.score) if attempt.score is not None else None,
+                "submitted_at": attempt.submitted_at,
+                "duration_seconds": attempt.duration_seconds,
+            }
+            for attempt, quiz in rows
+        ]
+
     def start_quiz_attempt(self, quiz_id: int, user_id: int) -> Dict[str, Any]:
         quiz = self.db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz or quiz.user_id != user_id:
@@ -745,7 +786,15 @@ class QuizService:
             self.db.add(progress)
 
         self.db.flush()
-        self._complete_study_attempt_if_ready(quiz_id, active_attempt)
+        was_completed = active_attempt.attempt_status == "completed"
+        completion_happened = self._complete_study_attempt_if_ready(
+            quiz_id, active_attempt
+        )
+        show_auto_feedback = (
+            self._decide_auto_feedback_for_first_completion(quiz)
+            if completion_happened and not was_completed
+            else False
+        )
 
         self.db.commit()
 
@@ -757,6 +806,7 @@ class QuizService:
             "statements": question.statements,
             "awarded_points": float(awarded_points),
             "ai_feedback": ai_feedback,
+            "show_auto_feedback": show_auto_feedback,
         }
 
     async def grade_and_save_single_answer_progress(
@@ -894,6 +944,7 @@ class QuizService:
             )
 
         quiz_attempt.score = total_score
+        show_auto_feedback = self._decide_auto_feedback_for_first_completion(quiz)
         self.db.commit()
 
         return {
@@ -906,6 +957,7 @@ class QuizService:
             "submit_reason": submit_reason,
             "duration_seconds": quiz_attempt.duration_seconds,
             "details": response_details,
+            "show_auto_feedback": show_auto_feedback,
         }
 
     async def grade_and_submit_entire_quiz(
@@ -1068,6 +1120,18 @@ class QuizService:
         attempt.attempt_status = "completed"
         attempt.submitted_at = datetime.now(timezone.utc)
         return True
+
+    @staticmethod
+    def _decide_auto_feedback_for_first_completion(quiz: Quiz) -> bool:
+        if quiz.auto_feedback_status != "pending":
+            return False
+
+        if random.random() < AUTO_FEEDBACK_PROBABILITY:
+            quiz.auto_feedback_status = "shown"
+            return True
+
+        quiz.auto_feedback_status = "skipped"
+        return False
 
     def _get_ordered_questions(
         self, quiz_id: int, attempt: Optional[QuizAttempt] = None
