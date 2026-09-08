@@ -40,10 +40,21 @@ const NAV_ITEMS = [
   },
 ];
 
+const ADMIN_NAV_ITEM = {
+  label: "Admin",
+  href: "/admin",
+  icon: UserIcon,
+};
+
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, logout } = useAuth();
+
+  const visibleNavItems =
+    currentUser?.role_name === "admin"
+      ? [...NAV_ITEMS, ADMIN_NAV_ITEM]
+      : NAV_ITEMS;
 
   const handleLogout = async () => {
     await logout();
@@ -80,7 +91,7 @@ export function Header() {
 
           {/* Navigation — desktop: hàng ngang đầy đủ label, giữ nguyên như bản gốc */}
           <nav className="hidden items-center gap-1 p-0 sm:flex">
-            {NAV_ITEMS.map((item) => {
+            {visibleNavItems.map((item) => {
               const ItemIcon = item.icon;
               const isActive = isNavItemActive(item.href);
 
@@ -114,7 +125,7 @@ export function Header() {
               align="end"
               className="w-56 rounded-[10px] border border-border p-1.5 shadow-lg sm:hidden"
             >
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const ItemIcon = item.icon;
                 const isActive = isNavItemActive(item.href);
 

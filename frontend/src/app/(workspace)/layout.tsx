@@ -107,15 +107,19 @@ export default function WorkspaceLayout({
   const isExamRoom = /^\/quizzes\/[^/]+\/exam$/.test(pathname);
 
   // These pages manage their own internal scrolling.
-  const ownsPageScroll = ["/notebooks", "/dashboard"].includes(pathname);
+  const ownsPageScroll = ["/notebooks", "/dashboard", "/admin"].includes(pathname);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // Auth Guard
   useEffect(() => {
-    if (!loading && !authenticated) {
+    if (loading) return;
+
+    if (!authenticated) {
       router.replace("/login");
+      return;
     }
+
   }, [authenticated, loading, router]);
 
   // Global Upload Event Listener

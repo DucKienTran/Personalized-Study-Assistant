@@ -3,9 +3,22 @@ from typing import List, Optional, Union
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 
-from app.core.dependencies import CurrentUserDep, PresenceServiceDep, UserServiceDep, get_current_user
+from app.core.dependencies import (
+    AuthServiceDep,
+    CurrentUserDep,
+    PresenceServiceDep,
+    UserServiceDep,
+    get_current_user,
+)
 from app.core.security import set_refresh_cookie
-from app.schemas.user_schema import ChangePassword, UserResponse, UserStatus
+from app.exceptions import ForbiddenError
+from app.schemas.user_schema import (
+    ChangePassword,
+    MessageResponse,
+    UserRegister,
+    UserResponse,
+    UserStatus,
+)
 
 router = APIRouter(
     prefix="/users",
@@ -13,6 +26,20 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 logger = logging.getLogger(__name__)
+
+
+@router.post(
+    "/admin", response_model=MessageResponse, status_code=status.HTTP_200_OK
+)
+async def create_admin(
+    user_data: UserRegister,
+    current_user: CurrentUserDep,
+    service: AuthServiceDep,
+):
+    if current_user.role != "admin":
+        raise ForbiddenError("Admin access required.")
+
+    return await service.register(user_data, role_name="admin")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -71,7 +98,6 @@ async def change_password(
     result = await service.change_password(current_user, data, refresh_token, request)
     set_refresh_cookie(response, result.pop("refresh_token"))
     return result
-
 
 @router.delete("/delete-account", status_code=status.HTTP_200_OK)
 async def delete_account(

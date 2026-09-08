@@ -1,5 +1,10 @@
 import api from "./api";
-import { MessageResponse, UserResponse } from "@/types";
+import {
+  MessageResponse,
+  UserRegister,
+  UserResponse,
+  UserStatus,
+} from "@/types";
 
 class UserService {
   /**
@@ -7,6 +12,21 @@ class UserService {
    */
   async getCurrentUser(): Promise<UserResponse> {
     const response = await api.get<UserResponse>("/users/me");
+    return response.data;
+  }
+
+  async getAllUsers(): Promise<UserResponse[]> {
+    const response = await api.get<UserResponse[]>("/users/all");
+    return response.data;
+  }
+
+  async getAllUserStatuses(): Promise<UserStatus[]> {
+    const response = await api.get<UserStatus[]>("/users/get-status");
+    return response.data;
+  }
+
+  async createAdmin(data: UserRegister): Promise<MessageResponse> {
+    const response = await api.post<MessageResponse>("/users/admin", data);
     return response.data;
   }
 
