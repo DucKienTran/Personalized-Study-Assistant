@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import logging
@@ -19,6 +20,24 @@ from app.services.summary.models import Digest, DigestSource
 from app.services.summary.token_batcher import TokenBatcher
 
 logger = logging.getLogger(__name__)
+
+
+def _derive_summary_title(summary_text: str, notebook_title: str) -> str:
+    for line in summary_text.splitlines():
+        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        if not match:
+            continue
+        title = re.sub(r"[*_`~]", "", match.group(1)).strip()
+        title = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", title).strip()
+        if title and title.casefold() not in {"summary", "notebook summary"}:
+            return title[:255].rstrip()
+    return f"{notebook_title} Summary"[:255].rstrip()
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedNotebookSummary:
+    text: str
+    record: NotebookSummary
 
 
 class SummaryService:
@@ -247,7 +266,8 @@ class SummaryService:
         level: str,
         format_type: str,
         instruction: str,
-    ) -> str:
+        include_record: bool = False,
+    ) -> str | GeneratedNotebookSummary:
         """
         Synthesize Notebook Summary using ONLY the active Document Digests.
         Applies a two-level cache strategy.
@@ -290,7 +310,11 @@ class SummaryService:
                     logger.info(
                         f"Notebook Summary cache hit for Notebook {notebook_id}"
                     )
-                    return mongo_doc["summary_text"]
+                    result = GeneratedNotebookSummary(
+                        text=mongo_doc["summary_text"],
+                        record=summary_record,
+                    )
+                    return result if include_record else result.text
 
         # Retrieve or build Document Digests
         document_digests = []
@@ -330,7 +354,7 @@ class SummaryService:
 
         new_summary_record = NotebookSummary(
             notebook_id=notebook_id,
-            title=f"Notebook Summary - {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')}",
+            title=_derive_summary_title(final_summary, notebook.title),
             mongo_summary_id=str(mongo_result.inserted_id),
             level=level,
             format=format_type,
@@ -339,5 +363,7 @@ class SummaryService:
         )
         self.sql_db.add(new_summary_record)
         self.sql_db.commit()
+        self.sql_db.refresh(new_summary_record)
 
-        return final_summary
+        result = GeneratedNotebookSummary(text=final_summary, record=new_summary_record)
+        return result if include_record else result.text

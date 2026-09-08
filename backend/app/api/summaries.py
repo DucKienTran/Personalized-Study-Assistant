@@ -37,17 +37,28 @@ async def generate_notebook_summary(
     current_user: CurrentUserDep,
 ):
     try:
-        summary_text = await summary_service.generate_notebook_summary(
+        summary = await summary_service.generate_notebook_summary(
             user_id=current_user.id,
             notebook_id=notebook_id,
             level=payload.level,
             format_type=payload.format,
             instruction=payload.instruction or "",
+            include_record=True,
         )
 
         return BaseResponse(
             message="Notebook summary generated successfully.",
-            data={"summary_text": summary_text},
+            data={
+                "id": summary.record.id,
+                "notebook_id": summary.record.notebook_id,
+                "title": summary.record.title,
+                "summary_text": summary.text,
+                "level": summary.record.level,
+                "format": summary.record.format,
+                "instruction": summary.record.instruction,
+                "source_document_ids": summary.record.source_document_ids,
+                "created_at": summary.record.created_at,
+            },
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

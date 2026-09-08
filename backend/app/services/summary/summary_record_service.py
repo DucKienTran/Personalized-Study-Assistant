@@ -209,5 +209,6 @@ class SummaryRecordService:
             "instruction": summary_record.instruction,
             "summary_text": mongo_summary.get("summary_text", ""),
             "draft_text": mongo_summary.get("draft_text"),
+            "source_document_ids": summary_record.source_document_ids,
             "created_at": summary_record.created_at,
         }

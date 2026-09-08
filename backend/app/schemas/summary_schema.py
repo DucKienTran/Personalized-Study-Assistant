@@ -3,7 +3,6 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-
 # ---------------------------------------------------------------------------
 # Request
 # ---------------------------------------------------------------------------
@@ -79,6 +78,7 @@ class NotebookSummaryDetail(BaseModel):
     instruction: Optional[str] = ""
     summary_text: str
     draft_text: Optional[str] = None
+    source_document_ids: list[int]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

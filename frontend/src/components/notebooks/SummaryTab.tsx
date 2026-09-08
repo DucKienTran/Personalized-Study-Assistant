@@ -1,531 +1,261 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Icon } from "@/components/shared/icons";
+import { SummaryContent } from "@/components/notebooks/SummaryContent";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import {
   summaryService,
-  SummaryLevel,
+  SummaryDetail,
   SummaryFormat,
+  SummaryHistoryItem,
+  SummaryLevel,
 } from "@/services/summary.service";
 
 interface SummaryTabProps {
   notebookId: number;
   activeDocumentCount: number;
-  summaryText: string;
-  setSummaryText: (text: string) => void;
-  isGenerating: boolean;
-  setIsGenerating: (generating: boolean) => void;
-  level: SummaryLevel;
-  setLevel: (level: SummaryLevel) => void;
-  format: SummaryFormat;
-  setFormat: (format: SummaryFormat) => void;
-  instruction: string;
-  setInstruction: (instruction: string) => void;
+  selectedSummaryId?: number | null;
+}
+
+function formatSummaryDate(value: string, detailed = false) {
+  return new Date(value).toLocaleDateString("en-US", detailed
+    ? { month: "short", day: "numeric", year: "numeric" }
+    : { month: "short", day: "numeric" });
 }
 
 export function SummaryTab({
   notebookId,
   activeDocumentCount,
-  summaryText,
-  setSummaryText,
-  isGenerating,
-  setIsGenerating,
-  level,
-  setLevel,
-  format,
-  setFormat,
-  instruction,
-  setInstruction,
+  selectedSummaryId,
 }: SummaryTabProps) {
+  const [summaries, setSummaries] = useState<SummaryHistoryItem[]>([]);
+  const [selectedSummary, setSelectedSummary] = useState<SummaryDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  // Chế độ xem: 'rendered' vs 'raw'
+  const [level, setLevel] = useState<SummaryLevel>("standard");
+  const [format, setFormat] = useState<SummaryFormat>("markdown");
+  const [instruction, setInstruction] = useState("");
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selectionRequestRef = useRef(0);
 
-  // Save Modal States
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [saveTitle, setSaveTitle] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const loadSummary = useCallback(async (summaryId: number) => {
+    const requestId = ++selectionRequestRef.current;
+    setError(null);
+    try {
+      const detail = await summaryService.getDetail(notebookId, summaryId);
+      if (requestId === selectionRequestRef.current) setSelectedSummary(detail);
+    } catch (err) {
+      console.error(err);
+      if (requestId === selectionRequestRef.current) setError("Could not open summary.");
+    }
+  }, [notebookId]);
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const history = await summaryService.listHistory(notebookId);
+      setSummaries(history);
+      const targetId = selectedSummaryId ?? history[0]?.id;
+      if (targetId) await loadSummary(targetId);
+      else setSelectedSummary(null);
+    } catch (err) {
+      console.error(err);
+      setError("Could not load summary history.");
+    } finally {
+      setLoading(false);
+    }
+  }, [loadSummary, notebookId, selectedSummaryId]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   const handleGenerate = async () => {
-    if (activeDocumentCount === 0) return;
+    if (!activeDocumentCount || generating) return;
+    setGenerating(true);
+    setError(null);
     try {
-      setIsGenerating(true);
-      setError(null);
-      const resultText = await summaryService.generate({
+      const created = await summaryService.generate({
         notebook_id: notebookId,
         level,
         format,
         instruction: instruction.trim() || undefined,
       });
-      setSummaryText(resultText);
-    } catch (err: any) {
-      console.error("Failed to generate notebook summary:", err);
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Không thể tạo tóm tắt. Vui lòng thử lại sau."
-      );
+      setSummaries((current) => [
+        created,
+        ...current.filter((item) => item.id !== created.id),
+      ]);
+      setSelectedSummary(created);
+    } catch (err) {
+      console.error(err);
+      setError("The summary could not be generated. Please try again.");
     } finally {
-      setIsGenerating(false);
+      setGenerating(false);
     }
   };
 
-  const handleSaveSummary = async () => {
-    if (!summaryText) return;
-    const defaultTitle = `Summary - ${new Date().toLocaleDateString("vi-VN")}`;
-    const finalTitle = saveTitle.trim() || defaultTitle;
-
-    try {
-      setIsSaving(true);
-      setError(null);
-      await summaryService.save({
-        notebook_id: notebookId,
-        title: finalTitle,
-        summary_text: summaryText,
-        level,
-        format,
-        instruction: instruction.trim() || undefined,
-      });
-
-      setIsSaveModalOpen(false);
-      setSaveTitle("");
-      setToastMsg("Đã lưu bản tóm tắt vào lịch sử!");
-      setTimeout(() => setToastMsg(null), 3000);
-    } catch (err: any) {
-      console.error("Failed to save summary:", err);
-      setError("Không thể lưu bản tóm tắt. Vui lòng thử lại.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCopyText = () => {
-    if (!summaryText) return;
-    navigator.clipboard.writeText(summaryText);
+  const handleCopy = async () => {
+    if (!selectedSummary) return;
+    await navigator.clipboard.writeText(selectedSummary.summary_text);
     setCopied(true);
-    setToastMsg("Đã sao chép nội dung tóm tắt!");
-    setTimeout(() => {
-      setCopied(false);
-      setToastMsg(null);
-    }, 2500);
+    window.setTimeout(() => setCopied(false), 2000);
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-full flex-1 items-center justify-center text-xs text-muted-foreground">
+        <Icon name="progress_activity" className="mr-2 animate-spin" />
+        Loading summaries...
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
-      {/* Toast Notification */}
-      {toastMsg && (
-        <div className="absolute top-4 right-6 z-50 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-[8px] shadow-md flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-          <Icon name="check_circle" className="text-base" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-3 sm:px-6">
+        <button
+          type="button"
+          onClick={() => setShowConfig((current) => !current)}
+          className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
+            showConfig || instruction
+              ? "border-primary/50 bg-primary/5 text-primary"
+              : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+          }`}
+        >
+          <Icon name="tune" className="text-base" />
+          Configure
+          <Icon name={showConfig ? "expand_less" : "expand_more"} className="text-base" />
+        </button>
 
-      {/* TOP TOOLBAR */}
-      <div className="border-b border-border/60 bg-card/40 px-6 py-2 flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className={`text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border transition-all cursor-pointer ${
-              showConfig || instruction
-                ? "border-primary/50 text-primary bg-primary/5"
-                : "border-border/80 text-muted-foreground hover:text-foreground bg-card"
-            }`}
-          >
-            <Icon name="tune" className="text-base" />
-            <span>Config & Instructions</span>
-            {instruction && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-            <Icon
-              name={showConfig ? "expand_less" : "expand_more"}
-              className="text-base text-muted-foreground"
-            />
-          </button>
-        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={!summaries.length}
+              aria-label="Summary history"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs text-muted-foreground outline-none hover:bg-secondary hover:text-foreground disabled:opacity-40"
+            >
+              <Icon name="history" size={17} />
+              History
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 rounded-xl p-1.5">
+              <div className="px-2 py-1.5">
+                <p className="text-xs font-semibold text-foreground">Summary history</p>
+                <p className="text-[10px] text-muted-foreground">Open a previously generated summary</p>
+              </div>
+              <div className="max-h-72 overflow-y-auto">
+                {summaries.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onClick={() => void loadSummary(item.id)}
+                    className={`cursor-pointer rounded-lg px-2 py-2 ${selectedSummary?.id === item.id ? "bg-secondary" : ""}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-medium text-foreground">{item.title}</div>
+                      <div className="mt-0.5 text-[10px] capitalize text-muted-foreground">
+                        {formatSummaryDate(item.created_at)} · {item.level} · {item.format.replace("_", " ")}
+                      </div>
+                    </div>
+                    {selectedSummary?.id === item.id && <Icon name="check" size={15} className="ml-2 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* TOP RIGHT: Regenerate / Save */}
-        {summaryText && (
-          <div className="flex items-center gap-2">
+          {selectedSummary && (
             <Button
+              type="button"
               onClick={handleGenerate}
+              disabled={generating || activeDocumentCount === 0}
               variant="outline"
-              size="sm"
-              className="rounded-[8px] text-xs font-medium border-border/80 hover:bg-secondary flex items-center gap-1.5 cursor-pointer"
+              size="icon-sm"
+              aria-label="Regenerate summary"
             >
-              <Icon name="refresh" className="text-sm" />
-              <span>Regenerate</span>
+              <RefreshCw className={generating ? "size-4 animate-spin" : "size-4"} />
             </Button>
-            <Button
-              onClick={() => setIsSaveModalOpen(true)}
-              size="sm"
-              className="rounded-[8px] text-xs font-medium bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <Icon name="bookmark" className="text-base" />
-              <span>Save Summary</span>
-            </Button>
-          </div>
-        )}
+          )}
+
+          <Button onClick={handleGenerate} disabled={!activeDocumentCount || generating} className="h-9 text-xs">
+            <Icon name={generating ? "progress_activity" : "auto_awesome"} className={generating ? "mr-1.5 animate-spin" : "mr-1.5"} />
+            {generating ? "Generating..." : "Generate summary"}
+          </Button>
+        </div>
       </div>
 
-      {/* EXPANDABLE CONFIG PANEL: Căn lề trái & giới hạn độ rộng đúng bằng khung summary */}
       {showConfig && (
-        <div className="border-b border-border/60 bg-secondary/15 p-4 px-6 shrink-0 animate-in slide-in-from-top-1 duration-200">
-          <div className="w-full space-y-4">
-            <div className="flex flex-wrap items-center gap-6">
-              {/* Length Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Length:</span>
-                <div className="flex items-center gap-1 bg-card p-1 rounded-[8px] border border-border/60">
-                  {(["brief", "standard", "comprehensive"] as SummaryLevel[]).map((lvl) => (
-                    <button
-                      key={lvl}
-                      onClick={() => setLevel(lvl)}
-                      className={`px-2.5 py-1 text-xs rounded-[8px] capitalize transition-all cursor-pointer ${
-                        level === lvl
-                          ? "bg-secondary text-foreground font-medium shadow-2xs"
-                          : "text-muted-foreground hover:text-foreground font-normal"
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Format Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Format:</span>
-                <div className="flex items-center gap-1 bg-card p-1 rounded-[8px] border border-border/60">
-                  <button
-                    onClick={() => setFormat("markdown")}
-                    className={`px-2.5 py-1 text-xs rounded-[8px] transition-all cursor-pointer ${
-                      format === "markdown"
-                        ? "bg-secondary text-foreground font-medium shadow-2xs"
-                        : "text-muted-foreground hover:text-foreground font-normal"
-                    }`}
-                  >
-                    Markdown
-                  </button>
-                  <button
-                    onClick={() => setFormat("raw_text")}
-                    className={`px-2.5 py-1 text-xs rounded-[8px] transition-all cursor-pointer ${
-                      format === "raw_text"
-                        ? "bg-secondary text-foreground font-medium shadow-2xs"
-                        : "text-muted-foreground hover:text-foreground font-normal"
-                    }`}
-                  >
-                    Raw Text
-                  </button>
-                </div>
-              </div>
+        <div className="shrink-0 space-y-4 border-b border-border/60 bg-secondary/15 px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Length:</span>
+              {(["brief", "standard", "comprehensive"] as SummaryLevel[]).map((item) => (
+                <button key={item} onClick={() => setLevel(item)} className={`rounded-lg px-2.5 py-1 text-xs capitalize ${level === item ? "bg-secondary font-medium" : "text-muted-foreground"}`}>{item}</button>
+              ))}
             </div>
-
-            {/* Additional Instructions: Thu hẹp độ rộng ngang bằng khung white box bên dưới */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground block">
-                Additional Instructions
-              </label>
-              <Textarea
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                placeholder="e.g. Focus on key definitions, equations, and critical concepts..."
-                className="text-xs bg-card border-border/70 min-h-[55px] resize-none rounded-[8px] focus-visible:ring-primary/30 w-full"
-              />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Format:</span>
+              {(["markdown", "raw_text"] as SummaryFormat[]).map((item) => (
+                <button key={item} onClick={() => setFormat(item)} className={`rounded-lg px-2.5 py-1 text-xs capitalize ${format === item ? "bg-secondary font-medium" : "text-muted-foreground"}`}>{item.replace("_", " ")}</button>
+              ))}
             </div>
           </div>
+          <Textarea value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Additional instructions..." className="min-h-16 resize-none text-xs" />
         </div>
       )}
 
-      {/* Error Banner */}
-      {error && (
-        <div className="mx-6 mt-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-[8px] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon name="error_outline" className="text-base shrink-0" />
-            <span>{error}</span>
+      {error && <div className="border-b border-destructive/20 bg-destructive/5 px-6 py-2 text-xs text-destructive">{error}</div>}
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        {generating ? (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <Icon name="menu_book" className="mb-3 animate-pulse text-4xl text-primary" />
+            <h3 className="text-sm font-semibold">Synthesizing Notebook Digests...</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Combining concepts from your active documents.</p>
           </div>
-          <button
-            onClick={() => setError(null)}
-            className="text-destructive/80 hover:text-destructive cursor-pointer"
-          >
-            <Icon name="close" className="text-base" />
-          </button>
-        </div>
-      )}
-
-      {/* MAIN CONTENT AREA: Đẩy lên sát trên, căn trái sát sidebar, bo góc rounded-[8px] */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 w-full flex flex-col">
-        {/* CASE 1: TRẠNG THÁI CHƯA CHỌN DOCUMENT NÀO */}
-        {activeDocumentCount === 0 ? (
-          <div className="mt-6">
-            <div className="border-2 border-dashed border-border/80 bg-card/60 rounded-[8px] p-8 py-12 flex flex-col items-center justify-center text-center shadow-2xs">
-              <div className="w-12 h-12 rounded-[8px] bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3">
-                <Icon name="warning" className="text-2xl" />
-              </div>
-
-              <h4 className="font-heading text-base font-semibold text-foreground">
-                No active document found
-              </h4>
-
-              <p className="text-xs text-muted-foreground max-w-md mt-2 mb-6 leading-relaxed">
-                Please enable at least one document in the left sidebar to generate a notebook summary.
-              </p>
-
-              <Button
-                disabled
-                size="default"
-                className="rounded-[8px] px-5 py-2 bg-muted text-muted-foreground flex items-center gap-2 cursor-not-allowed text-xs font-medium opacity-60"
-              >
-                <Icon name="auto_awesome" className="text-base" />
-                <span>Summarize Notebook</span>
-              </Button>
-            </div>
-          </div>
-        ) : isGenerating ? (
-          /* CASE 2: ĐANG TẠO TÓM TẮT (LOADING PENDING STATE) */
-          <div className="my-auto py-16 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-12 h-12 rounded-[8px] bg-primary/10 text-primary flex items-center justify-center animate-pulse">
-              <Icon name="menu_book" className="text-2xl animate-bounce" />
-            </div>
-            <div>
-              <h4 className="font-heading text-sm font-semibold text-foreground">
-                Synthesizing Notebook Digests...
-              </h4>
-              <p className="text-xs text-muted-foreground max-w-sm mt-1">
-                AI is processing active documents and combining concepts into a unified summary.
-              </p>
-            </div>
-          </div>
-        ) : !summaryText ? (
-          /* CASE 3: CHƯA GENERATE -> KHUNG VIỀN NÉT ĐỨT ĐẨY LÊN SÁT TRÊN */
-          <div className="mt-6">
-            <div className="border-2 border-dashed border-border/80 bg-card/60 rounded-xl p-8 py-12 flex flex-col items-center justify-center text-center shadow-2xs">
-              <div className="w-12 h-12 rounded-[8px] bg-secondary/80 text-muted-foreground flex items-center justify-center mb-3">
-                <Icon name="menu_book" className="text-2xl" />
-              </div>
-
-              <h4 className="font-heading text-base font-semibold text-foreground">
-                Generate Notebook Summary
-              </h4>
-
-              <p className="text-xs text-muted-foreground max-w-md mt-2 mb-6 leading-relaxed">
-                Synthesize key concepts, formulas, and connections across all{" "}
-                <span className="font-medium text-foreground/80 whitespace-nowrap">
-                  {activeDocumentCount} active document(s)
-                </span>{" "}
-                in this notebook.
-              </p>
-
-              <Button
-                onClick={handleGenerate}
-                size="default"
-                className="rounded-[8px] px-5 py-2 bg-[#3b5e47] hover:bg-[#2d4a37] text-white flex items-center gap-2 shadow-xs cursor-pointer text-xs font-medium"
-              >
-                <Icon name="auto_awesome" className="text-base" />
-                <span>Summarize Notebook</span>
-              </Button>
-            </div>
+        ) : !selectedSummary ? (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <Icon name={activeDocumentCount ? "menu_book" : "warning"} className="mb-3 text-4xl text-muted-foreground/60" />
+            <h3 className="font-heading text-base font-semibold">{activeDocumentCount ? "Generate your first summary" : "No active document found"}</h3>
+            <p className="mt-1 max-w-md text-xs text-muted-foreground">{activeDocumentCount ? "Create a saved summary from the notebook's active sources." : "Enable at least one document to generate a summary."}</p>
           </div>
         ) : (
-          /* CASE 4: HIỂN THỊ KẾT QUẢ SUMMARY (Đổi vị trí nút Copy & Toggle View Mode, Render bảng Markdown chuẩn) */
-          <div className="space-y-4 pt-1 pb-12">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <div>
-                <h3 className="font-heading text-sm font-bold text-foreground">
-                  Notebook Summary
-                </h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
-                  Level: {level} • Format: {format}
-                </p>
-              </div>
-
-              {/* Nút Copy sang bên phải phía header nếu muốn hoặc giữ nguyên tùy chỉnh */}
-            </div>
-
-            {/* CONTAINER HIỂN THỊ NỘI DUNG TÓM TẮT */}
-            <div className="bg-card border border-border/80 rounded-[8px] p-6 shadow-2xs relative group">
-              {/* 1. Toggle View Mode chuyển sang góc TRÊN BÊN TRÁI (Vị trí cũ của nút copy) */}
-              <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-secondary/80 p-1 rounded-[8px] border border-border/60">
-                <button
-                  onClick={() => setViewMode("rendered")}
-                  className={`p-1 rounded-[8px] transition-all cursor-pointer ${
-                    viewMode === "rendered"
-                      ? "bg-card text-foreground shadow-2xs font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  title="Rendered View"
-                >
-                  <Icon name="visibility" className="text-sm" />
-                </button>
-                <button
-                  onClick={() => setViewMode("raw")}
-                  className={`p-1 rounded-[8px] transition-all cursor-pointer ${
-                    viewMode === "raw"
-                      ? "bg-card text-foreground shadow-2xs font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  title="Raw Markdown Source"
-                >
-                  <Icon name="code" className="text-sm" />
+          <div className="mx-auto w-full max-w-5xl pb-12">
+            <header className="mb-4 border-b border-border/60 pb-4">
+              <h2 className="font-heading text-xl font-semibold text-foreground">{selectedSummary.title}</h2>
+              <p className="mt-1 text-xs capitalize text-muted-foreground">
+                {formatSummaryDate(selectedSummary.created_at, true)} · {selectedSummary.level} · {selectedSummary.format.replace("_", " ")}
+              </p>
+            </header>
+            <div className="relative rounded-xl border border-border/80 bg-card p-6 shadow-2xs">
+              <div className="mb-5 flex items-center justify-between gap-2">
+                <div className="flex rounded-lg border border-border/60 bg-secondary/60 p-1">
+                  <button onClick={() => setViewMode("rendered")} className={`rounded-md p-1 ${viewMode === "rendered" ? "bg-card shadow-2xs" : "text-muted-foreground"}`} title="Rendered view"><Icon name="visibility" className="text-sm" /></button>
+                  <button onClick={() => setViewMode("raw")} className={`rounded-md p-1 ${viewMode === "raw" ? "bg-card shadow-2xs" : "text-muted-foreground"}`} title="Raw source"><Icon name="code" className="text-sm" /></button>
+                </div>
+                <button onClick={() => void handleCopy()} className="flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/60 px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                  <Icon name={copied ? "check" : "content_copy"} className="text-sm" />
+                  {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-
-              {/* 2. Nút Copy chuyển sang góc TRÊN BÊN PHẢI */}
-              <button
-                onClick={handleCopyText}
-                className="absolute top-3 right-3 z-10 p-1.5 rounded-[8px] bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer flex items-center gap-1 text-[11px]"
-                title="Copy raw content"
-              >
-                <Icon name={copied ? "check" : "content_copy"} className="text-sm" />
-                {copied && <span>Copied</span>}
-              </button>
-
-              <div className="pt-10 text-xs leading-relaxed text-foreground">
-                {viewMode === "rendered" ? (
-                  /* Rendered Markdown View (Hỗ trợ render bảng Markdown chuẩn) */
-                  <div className="prose prose-xs dark:prose-invert max-w-none space-y-3 font-sans">
-                    {summaryText.split("\n\n").map((block, idx) => {
-                      // Kiểm tra nếu là khối Markdown Table
-                      if (block.includes("|") && block.includes("---")) {
-                        const rows = block
-                          .trim()
-                          .split("\n")
-                          .map((r) =>
-                            r
-                              .split("|")
-                              .map((cell) => cell.trim())
-                              .filter(Boolean)
-                          )
-                          .filter((r) => r.length > 0 && !r[0].includes("---"));
-
-                        if (rows.length > 0) {
-                          const [header, ...bodyRows] = rows;
-                          return (
-                            <div key={idx} className="my-4 overflow-x-auto">
-                              <table className="w-full border-collapse border border-border text-xs text-left">
-                                <thead>
-                                  <tr className="bg-secondary/50">
-                                    {header.map((th, thIdx) => (
-                                      <th
-                                        key={thIdx}
-                                        className="border border-border px-3 py-2 font-bold text-foreground"
-                                      >
-                                        {th}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {bodyRows.map((row, rIdx) => (
-                                    <tr key={rIdx} className="hover:bg-secondary/20">
-                                      {row.map((td, tdIdx) => (
-                                        <td
-                                          key={tdIdx}
-                                          className="border border-border px-3 py-2 text-foreground/90"
-                                        >
-                                          {td}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          );
-                        }
-                      }
-
-                      if (block.startsWith("## ")) {
-                        return (
-                          <h2
-                            key={idx}
-                            className="text-sm font-bold text-foreground border-b border-border/40 pb-1 mt-4 mb-2"
-                          >
-                            {block.replace("## ", "")}
-                          </h2>
-                        );
-                      }
-                      if (block.startsWith("# ")) {
-                        return (
-                          <h1
-                            key={idx}
-                            className="text-base font-bold text-foreground border-b border-border/60 pb-1 mt-5 mb-2"
-                          >
-                            {block.replace("# ", "")}
-                          </h1>
-                        );
-                      }
-                      return (
-                        <p key={idx} className="whitespace-pre-wrap leading-relaxed">
-                          {block}
-                        </p>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  /* Raw Code View */
-                  <pre className="font-mono text-xs whitespace-pre-wrap overflow-x-auto bg-secondary/30 p-3 rounded-[8px] border border-border/40">
-                    {summaryText}
-                  </pre>
-                )}
+              <div className="text-xs leading-relaxed text-foreground">
+                <SummaryContent content={selectedSummary.summary_text} format={selectedSummary.format} viewMode={viewMode} />
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* MODAL SAVE */}
-      {isSaveModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-[8px] w-full max-w-md p-5 shadow-lg space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading text-sm font-bold">Save Summary Version</h3>
-              <button
-                onClick={() => setIsSaveModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-[8px]"
-              >
-                <Icon name="close" className="text-base" />
-              </button>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-foreground">Summary Title</label>
-              <Input
-                value={saveTitle}
-                onChange={(e) => setSaveTitle(e.target.value)}
-                placeholder={`Summary - ${new Date().toLocaleDateString("vi-VN")}`}
-                className="text-xs rounded-[8px]"
-              />
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsSaveModalOpen(false)}
-                className="rounded-[8px] text-xs"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveSummary}
-                disabled={isSaving}
-                size="sm"
-                className="rounded-[8px] text-xs font-medium bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] cursor-pointer"
-              >
-                {isSaving && (
-                  <Icon name="progress_activity" className="animate-spin text-sm mr-1.5" />
-                )}
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

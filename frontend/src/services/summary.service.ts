@@ -42,6 +42,7 @@ export interface SummaryDetail {
 
     summary_text: string;
     draft_text: string | null;
+    source_document_ids: number[];
 
     created_at: string;
 }
@@ -52,7 +53,7 @@ export interface SummaryDetail {
 
 export const summaryService = {
     /**
-     * Generate notebook summary (does not save).
+     * Generate or reuse a notebook summary.
      */
     async generate(payload: {
         notebook_id: number;
@@ -62,18 +63,14 @@ export const summaryService = {
     }) {
         const { notebook_id, ...body } = payload;
 
-        const res = await api.post<
-            ApiResponse<{
-                summary_text: string;
-            }>
-        >(`/notebooks/${notebook_id}/summary`, {
+        const res = await api.post<ApiResponse<SummaryDetail>>(`/notebooks/${notebook_id}/summary`, {
             level: "standard",
             format: "markdown",
             instruction: "",
             ...body,
         });
 
-        return res.data.data.summary_text;
+        return res.data.data;
     },
 
     /**
