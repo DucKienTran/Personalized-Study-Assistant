@@ -19,3 +19,6 @@ Thumbs.db
 !.env.example
 .docker/
 
+# Local handoff artifacts
+assistant_phase2_core.zip
+
