@@ -84,6 +84,16 @@ YÊU CẦU:
 NHIỆM VỤ:
 - Dựa trên lịch sử hội thoại và câu hỏi mới nhất, hãy viết lại câu hỏi thành một câu hoàn chỉnh, độc lập, đủ ngữ cảnh để tìm kiếm tài liệu.
 - Giữ nguyên ý nghĩa của câu hỏi.
+- Bảo toàn các ràng buộc đã được xác định trong hội thoại, đặc biệt:
+  + tên sản phẩm/gói/đối tượng;
+  + năm hoặc phiên bản;
+  + khách hàng hoặc tổ chức cụ thể;
+  + khu vực;
+  + loại chính sách hoặc phạm vi tài liệu đang được hỏi;
+  + đối tượng đang được so sánh.
+- Không thay thế hoặc mở rộng phạm vi đã được xác định trừ khi câu hỏi mới của người dùng thay đổi nó một cách rõ ràng.
+- Nếu câu hỏi mới sử dụng đại từ hoặc các cụm như "nó", "trường hợp đó", "thời gian đó", "còn bình thường thì sao", "what about that case", hãy thay chúng bằng đối tượng và phạm vi cụ thể từ lịch sử.
+- Khi có nhiều sản phẩm hoặc phiên bản tương tự, phải giữ chính xác sản phẩm và phiên bản đã được xác định trong hội thoại.
 - Không trả lời câu hỏi.
 - Không thêm thông tin không có trong lịch sử hội thoại.
 - Chỉ trả về duy nhất câu hỏi đã viết lại, không giải thích.

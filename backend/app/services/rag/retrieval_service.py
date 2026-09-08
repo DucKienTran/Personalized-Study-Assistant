@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 _global_ranker: Ranker | None = None
 CANDIDATE_MULTIPLIER = 4
+MAX_CONTEXT_CHUNKS = 12
+MAX_CONTEXT_ESTIMATED_TOKENS = 10_000
+CONTEXT_REDUNDANCY_THRESHOLD = 0.85
+MAX_RETRIEVAL_QUERIES = 4
+MAX_RERANK_CANDIDATES = 40
 RRF_K = 60
 RERANKER_MODEL = FLASHRANK_DEFAULT_MODEL
 
@@ -36,18 +41,109 @@ def _tokenize_text(text: str) -> List[str]:
     return re.findall(r"\w+", text.lower())
 
 
+def _normalize_for_overlap(text: str) -> str:
+    return " ".join(_tokenize_text(text))
+
+
+def _estimated_tokens(text: str) -> int:
+    return max(1, len(text) // 4)
+
+
+def _is_redundant(
+    candidate: RetrievalResult,
+    selected: List[RetrievalResult],
+) -> bool:
+    candidate_normalized = _normalize_for_overlap(candidate.text)
+    candidate_tokens = set(candidate_normalized.split())
+    for existing in selected:
+        if candidate.chunk_id == existing.chunk_id:
+            return True
+        existing_normalized = _normalize_for_overlap(existing.text)
+        if candidate_normalized and candidate_normalized == existing_normalized:
+            return True
+        existing_tokens = set(existing_normalized.split())
+        union = candidate_tokens | existing_tokens
+        if union and len(candidate_tokens & existing_tokens) / len(union) >= (
+            CONTEXT_REDUNDANCY_THRESHOLD
+        ):
+            return True
+    return False
+
+
+def build_retrieval_queries(query: str) -> list[str]:
+    original = " ".join(query.split())
+    if not original:
+        return [query]
+
+    scope = ""
+    requirements: list[str] = []
+    bullet_matches = list(
+        re.finditer(r"(?:^|\n)\s*(?:[-*\u2022]|\d+[.)])\s+([^\n]+)", query)
+    )
+    if len(bullet_matches) >= 2:
+        scope = " ".join(query[: bullet_matches[0].start()].strip(" :\n").split())
+        requirements = [match.group(1) for match in bullet_matches]
+    else:
+        numeric_requirements = list(
+            re.finditer(
+                r"\b\d+(?:[.,]\d+)?\s*(?:members?|users?|seats?|workspaces?|"
+                r"mb|gb|tb|hours?|hrs?|days?|minutes?|mins?)\b",
+                original,
+                flags=re.IGNORECASE,
+            )
+        )
+        has_numeric_list = len(numeric_requirements) >= 2 or (
+            len(numeric_requirements) == 1
+            and re.search(r"[,;]", original[numeric_requirements[0].end() :]) is not None
+        )
+        list_start = numeric_requirements[0].start() if has_numeric_list else None
+        if list_start is None:
+            comparison_match = re.search(r"\b(?:for|across|on)\s+", original, re.IGNORECASE)
+            if comparison_match and re.search(r"[,;]", original[comparison_match.end() :]):
+                list_start = comparison_match.end()
+        if list_start is None and ":" in original:
+            colon_index = original.index(":")
+            if ";" in original[colon_index + 1 :]:
+                list_start = colon_index + 1
+
+        if list_start is not None:
+            scope = original[:list_start].strip(" :,-")
+            tail = original[list_start:].strip(" ?.!")
+            requirements = re.split(
+                r"\s*(?:,|;|\n)\s*|\s+(?:and|và)\s+",
+                tail,
+                flags=re.IGNORECASE,
+            )
+
+    requirements = [" ".join(item.strip(" ?.!").split()) for item in requirements]
+    requirements = [item for item in requirements if item]
+    if len(requirements) < 2:
+        return [original]
+
+    max_subqueries = MAX_RETRIEVAL_QUERIES - 1
+    if len(requirements) > max_subqueries:
+        requirements = [
+            *requirements[: max_subqueries - 1],
+            " and ".join(requirements[max_subqueries - 1 :]),
+        ]
+
+    subqueries = [f"{scope} {item}".strip() for item in requirements]
+    return list(dict.fromkeys([original, *subqueries]))[:MAX_RETRIEVAL_QUERIES]
+
+
 class RetrievalService:
     def __init__(
         self,
         chroma_client: ClientAPI,
         embedding_service: EmbeddingService,
         redis: Redis,
+        collection_name: str | None = None,
     ):
         self.chroma_client = chroma_client
         self.embedding_service = embedding_service
         self.redis = redis
         self.chroma_collection = self.chroma_client.get_or_create_collection(
-            name=settings.CHROMA_COLLECTION_NAME
+            name=collection_name or settings.CHROMA_COLLECTION_NAME
         )
         self.ranker = _get_global_ranker()
         self._bm25_cache: Dict[Tuple[int, str], Dict[str, Any]] = {}
@@ -111,6 +207,9 @@ class RetrievalService:
                     page_start=int(meta.get("page_start", 0)),
                     page_end=int(meta.get("page_end", 0)),
                     header_path=meta.get("header_path", []),
+                    previous_chunk=meta.get("previous_chunk"),
+                    next_chunk=meta.get("next_chunk"),
+                    beir_corpus_id=meta.get("beir_corpus_id"),
                 )
             )
         if trace and trace_candidates is not None:
@@ -158,6 +257,9 @@ class RetrievalService:
                     "page_start": int(meta.get("page_start") or 0),
                     "page_end": int(meta.get("page_end") or 0),
                     "header_path": meta.get("header_path", []),
+                    "previous_chunk": meta.get("previous_chunk"),
+                    "next_chunk": meta.get("next_chunk"),
+                    "beir_corpus_id": meta.get("beir_corpus_id"),
                     "tokens": _tokenize_text(doc),
                 }
             )
@@ -233,6 +335,9 @@ class RetrievalService:
                     page_start=item["page_start"],
                     page_end=item["page_end"],
                     header_path=item["header_path"],
+                    previous_chunk=item.get("previous_chunk"),
+                    next_chunk=item.get("next_chunk"),
+                    beir_corpus_id=item.get("beir_corpus_id"),
                 )
             )
 
@@ -343,6 +448,7 @@ class RetrievalService:
                 {
                     "chunk_id": result.chunk_id,
                     "document_id": result.document_id,
+                    "document_title": result.document_title,
                     "input_rank": rank,
                 }
                 for rank, result in enumerate(candidates, start=1)
@@ -353,7 +459,20 @@ class RetrievalService:
         input_ranks = {candidate["chunk_id"]: candidate["input_rank"] for candidate in trace_inputs}
         try:
             candidate_map = {res.chunk_id: res for res in candidates}
-            passages = [{"id": res.chunk_id, "text": res.text} for res in candidates]
+            passages = []
+            for res in candidates:
+                parts = []
+                if res.document_title:
+                    parts.append(f"Document: {res.document_title}")
+                if res.header_path:
+                    parts.append(f"Section: {' > '.join(res.header_path)}")
+                parts.append(res.text)
+                passages.append(
+                    {
+                        "id": res.chunk_id,
+                        "text": "\n\n".join(parts),
+                    }
+                )
 
             rerank_request = RerankRequest(query=query, passages=passages)
             results = self.ranker.rerank(rerank_request)  # already sorted best-first
@@ -405,7 +524,141 @@ class RetrievalService:
                 )
             return fallback_results
 
-    async def hybrid_search(
+    def _fetch_chunks_by_ids_sync(self, chunk_ids: list[str]) -> List[RetrievalResult]:
+        unique_ids = list(dict.fromkeys(chunk_id for chunk_id in chunk_ids if chunk_id))
+        if not unique_ids:
+            return []
+
+        results = self.chroma_collection.get(
+            ids=unique_ids,
+            include=["documents", "metadatas"],
+        )
+        if not results or not results.get("ids"):
+            return []
+
+        fetched = []
+        for chunk_id, text, meta in zip(
+            results["ids"],
+            results.get("documents") or [],
+            results.get("metadatas") or [],
+        ):
+            if text is None or meta is None:
+                continue
+            fetched.append(
+                RetrievalResult(
+                    chunk_id=chunk_id,
+                    document_id=int(meta.get("document_id", 0)),
+                    text=text,
+                    page_start=int(meta.get("page_start") or 0),
+                    page_end=int(meta.get("page_end") or 0),
+                    header_path=meta.get("header_path", []),
+                    previous_chunk=meta.get("previous_chunk"),
+                    next_chunk=meta.get("next_chunk"),
+                    context_role="neighbor",
+                    beir_corpus_id=meta.get("beir_corpus_id"),
+                )
+            )
+        return fetched
+
+    async def fetch_chunks_by_ids(self, chunk_ids: list[str]) -> List[RetrievalResult]:
+        return await asyncio.to_thread(self._fetch_chunks_by_ids_sync, chunk_ids)
+
+    async def _expand_with_neighbors(
+        self,
+        reranked: List[RetrievalResult],
+        trace: EvaluationTrace | None = None,
+    ) -> List[RetrievalResult]:
+        remaining_slots = MAX_CONTEXT_CHUNKS - len(reranked)
+        estimated_context_tokens = sum(_estimated_tokens(result.text) for result in reranked)
+        selected_ids = {result.chunk_id for result in reranked}
+        requested_neighbors: list[str] = []
+        neighbor_sources: dict[str, RetrievalResult] = {}
+        redundant_neighbors_skipped = 0
+        for result in reranked:
+            for neighbor_id in (result.previous_chunk, result.next_chunk):
+                if not neighbor_id:
+                    continue
+                if neighbor_id in selected_ids or neighbor_id in neighbor_sources:
+                    redundant_neighbors_skipped += 1
+                else:
+                    requested_neighbors.append(neighbor_id)
+                    neighbor_sources[neighbor_id] = result
+
+        if remaining_slots <= 0 or not requested_neighbors:
+            if trace:
+                trace.set_context_packing(
+                    {
+                        "primary_count": len(reranked),
+                        "neighbor_candidates": len(requested_neighbors),
+                        "neighbors_added": 0,
+                        "redundant_neighbors_skipped": redundant_neighbors_skipped,
+                        "budget_skipped": 0,
+                        "estimated_context_tokens": estimated_context_tokens,
+                    }
+                )
+            return reranked
+
+        fetched_by_id = {
+            result.chunk_id: result
+            for result in await self.fetch_chunks_by_ids(requested_neighbors)
+        }
+        neighbors = []
+        budget_skipped = 0
+        selected = list(reranked)
+        section_counts: dict[tuple[str, ...], int] = {}
+        for result in selected:
+            section = tuple(result.header_path)
+            section_counts[section] = section_counts.get(section, 0) + 1
+
+        request_order = {chunk_id: index for index, chunk_id in enumerate(requested_neighbors)}
+        for source in reranked:
+            source_neighbors = [
+                fetched_by_id[neighbor_id]
+                for neighbor_id in requested_neighbors
+                if neighbor_sources[neighbor_id].chunk_id == source.chunk_id
+                and neighbor_id in fetched_by_id
+                and fetched_by_id[neighbor_id].document_id == source.document_id
+            ]
+            source_neighbors.sort(
+                key=lambda neighbor: (
+                    section_counts.get(tuple(neighbor.header_path), 0),
+                    request_order[neighbor.chunk_id],
+                )
+            )
+            for neighbor in source_neighbors:
+                if _is_redundant(neighbor, selected):
+                    redundant_neighbors_skipped += 1
+                    continue
+                neighbor_tokens = _estimated_tokens(neighbor.text)
+                if estimated_context_tokens + neighbor_tokens > MAX_CONTEXT_ESTIMATED_TOKENS:
+                    budget_skipped += 1
+                    continue
+                neighbor.neighbor_of = source.chunk_id
+                neighbors.append(neighbor)
+                selected.append(neighbor)
+                estimated_context_tokens += neighbor_tokens
+                section = tuple(neighbor.header_path)
+                section_counts[section] = section_counts.get(section, 0) + 1
+                if len(neighbors) >= remaining_slots:
+                    break
+            if len(neighbors) >= remaining_slots:
+                break
+
+        if trace:
+            trace.set_context_packing(
+                {
+                    "primary_count": len(reranked),
+                    "neighbor_candidates": len(requested_neighbors),
+                    "neighbors_added": len(neighbors),
+                    "redundant_neighbors_skipped": redundant_neighbors_skipped,
+                    "budget_skipped": budget_skipped,
+                    "estimated_context_tokens": estimated_context_tokens,
+                }
+            )
+
+        return [*reranked, *neighbors]
+
+    async def hybrid_candidates(
         self,
         query: str,
         user_id: int,
@@ -413,8 +666,6 @@ class RetrievalService:
         top_k: int = 5,
         trace: EvaluationTrace | None = None,
     ) -> List[RetrievalResult]:
-        logger.info(f"executing hybrid search for query='{query[:30]}...' user_id={user_id}")
-
         vector_results, bm25_results = await asyncio.gather(
             self.vector_search(
                 query=query,
@@ -440,6 +691,85 @@ class RetrievalService:
         )
         if trace:
             trace.set_timing("rrf", (perf_counter() - rrf_started) * 1000)
+        return candidates
+
+    @staticmethod
+    def _merge_query_candidates(
+        candidate_groups: list[List[RetrievalResult]],
+    ) -> List[RetrievalResult]:
+        if len(candidate_groups) == 1:
+            return candidate_groups[0][:MAX_RERANK_CANDIDATES]
+
+        merged: dict[str, dict[str, Any]] = {}
+        seen_order = 0
+        for query_index, candidates in enumerate(candidate_groups):
+            for rank, candidate in enumerate(candidates, start=1):
+                entry = merged.get(candidate.chunk_id)
+                if entry is None:
+                    entry = {
+                        "result": candidate,
+                        "query_hits": 0,
+                        "best_rank": rank,
+                        "original_rank": rank if query_index == 0 else None,
+                        "seen_order": seen_order,
+                    }
+                    merged[candidate.chunk_id] = entry
+                    seen_order += 1
+                else:
+                    result = entry["result"]
+                    for score_field in ("vector_score", "bm25_score", "retrieval_score"):
+                        current_score = getattr(result, score_field)
+                        candidate_score = getattr(candidate, score_field)
+                        if candidate_score is not None and (
+                            current_score is None or candidate_score > current_score
+                        ):
+                            setattr(result, score_field, candidate_score)
+                    entry["best_rank"] = min(entry["best_rank"], rank)
+                    if query_index == 0:
+                        entry["original_rank"] = rank
+                entry["query_hits"] += 1
+
+        ranked_entries = sorted(
+            merged.values(),
+            key=lambda entry: (
+                -entry["query_hits"],
+                entry["best_rank"],
+                entry["original_rank"] if entry["original_rank"] is not None else float("inf"),
+                entry["seen_order"],
+            ),
+        )
+        return [entry["result"] for entry in ranked_entries[:MAX_RERANK_CANDIDATES]]
+
+    async def hybrid_search(
+        self,
+        query: str,
+        user_id: int,
+        document_ids: list[int],
+        document_titles: dict[int, str] | None = None,
+        top_k: int = 5,
+        trace: EvaluationTrace | None = None,
+    ) -> List[RetrievalResult]:
+        logger.info(f"executing hybrid search for query='{query[:30]}...' user_id={user_id}")
+        retrieval_queries = build_retrieval_queries(query)
+        if trace:
+            trace.set_retrieval_queries(retrieval_queries)
+
+        candidate_groups = await asyncio.gather(
+            *[
+                self.hybrid_candidates(
+                    query=retrieval_query,
+                    user_id=user_id,
+                    document_ids=document_ids,
+                    top_k=top_k,
+                    trace=trace if index == 0 else None,
+                )
+                for index, retrieval_query in enumerate(retrieval_queries)
+            ]
+        )
+        candidates = self._merge_query_candidates(candidate_groups)
+        if document_titles:
+            for candidate in candidates:
+                candidate.document_title = document_titles.get(candidate.document_id)
 
         rerank_started = perf_counter()
         reranked = self.rerank(
@@ -451,5 +781,9 @@ class RetrievalService:
         if trace:
             trace.set_timing("reranking", (perf_counter() - rerank_started) * 1000)
 
-        logger.info(f"hybrid search completed, returned {len(reranked)} chunks")
-        return reranked
+        expanded = await self._expand_with_neighbors(reranked, trace=trace)
+        if document_titles:
+            for result in expanded:
+                result.document_title = document_titles.get(result.document_id)
+        logger.info(f"hybrid search completed, returned {len(expanded)} chunks")
+        return expanded

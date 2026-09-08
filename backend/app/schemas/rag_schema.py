@@ -16,7 +16,7 @@ class RAGQueryRequest(BaseModel):
     )
 
     top_k: int = Field(
-        5,
+        8,
         ge=1,
         le=20,
         description="Số lượng chunk retrieval",

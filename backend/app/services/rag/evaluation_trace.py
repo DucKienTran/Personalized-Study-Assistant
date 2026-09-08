@@ -104,6 +104,7 @@ class EvaluationTrace:
                 "notebook_id": None,
                 "active_document_ids": [],
                 "top_k": top_k,
+                "retrieval_queries": [original_query],
             },
             "retrieval": {
                 "vector_candidates": [],
@@ -115,7 +116,7 @@ class EvaluationTrace:
                     "fallback": False,
                 },
             },
-            "context": {"final_order": []},
+            "context": {"final_order": [], "context_packing": {}},
             "generation": {"answer_characters": 0},
             "citations": {"sources": []},
             "timings_ms": {
@@ -155,6 +156,10 @@ class EvaluationTrace:
         with self._lock:
             self.data["timings_ms"][stage] = round(duration_ms, 3)
 
+    def set_retrieval_queries(self, queries: list[str]) -> None:
+        with self._lock:
+            self.data["query"]["retrieval_queries"] = list(queries)
+
     def set_retrieval_stage(self, stage: str, value: Any) -> None:
         with self._lock:
             self.data["retrieval"][stage] = deepcopy(value)
@@ -170,6 +175,10 @@ class EvaluationTrace:
     def set_context_order(self, chunks: list[dict]) -> None:
         with self._lock:
             self.data["context"]["final_order"] = deepcopy(chunks)
+
+    def set_context_packing(self, summary: dict[str, Any]) -> None:
+        with self._lock:
+            self.data["context"]["context_packing"] = deepcopy(summary)
 
     def set_citations(self, sources: list[dict]) -> None:
         with self._lock:

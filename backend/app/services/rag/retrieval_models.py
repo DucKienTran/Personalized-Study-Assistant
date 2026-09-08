@@ -15,6 +15,12 @@ class RetrievalResult:
     page_start: int = 0
     page_end: int = 0
     header_path: list[str] = field(default_factory=list)
+    previous_chunk: str | None = None
+    next_chunk: str | None = None
+    context_role: str = "reranked"
+    neighbor_of: str | None = None
+    document_title: str | None = None
+    beir_corpus_id: str | None = None
 
 
 @dataclass(slots=True)

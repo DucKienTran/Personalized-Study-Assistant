@@ -122,7 +122,7 @@ class RAGService:
         user_id: int,
         sql_db: Session,
         notebook_id: int,
-        top_k: int = 5,
+        top_k: int = 8,
         chat_history: Optional[List[Dict[str, str]]] = None,
         trace: EvaluationTrace | None = None,
     ) -> Tuple[
@@ -170,11 +170,19 @@ class RAGService:
                 trace.set_timing("context_building", 0.0)
             return [], [], "", metadata
 
+        docs = (
+            sql_db.query(SQLDocument.id, SQLDocument.title)
+            .filter(SQLDocument.id.in_(document_ids))
+            .all()
+        )
+        doc_title_map = {doc.id: doc.title for doc in docs}
+
         retrieval_started = perf_counter()
         retrieved_chunks = await self.retrieval_service.hybrid_search(
             query=search_query,
             user_id=user_id,
             document_ids=document_ids,
+            document_titles=doc_title_map,
             top_k=top_k,
             trace=trace,
         )
@@ -186,23 +194,13 @@ class RAGService:
         context_started = perf_counter()
         ordered_chunks = _reorder_chunks_lost_in_the_middle(retrieved_chunks)
 
-        doc_ids = list({chunk.document_id for chunk in ordered_chunks})
-
-        docs = (
-            sql_db.query(SQLDocument.id, SQLDocument.title)
-            .filter(SQLDocument.id.in_(doc_ids))
-            .all()
-        )
-
-        doc_title_map = {doc.id: doc.title for doc in docs}
-
         context_blocks = []
         citation_sources = []
 
         for position, chunk in enumerate(ordered_chunks, start=1):
-            # citation number = reranker rank (relevance-meaningful),
-            # not physical position after lost-in-the-middle reordering
-            idx = chunk.rank if chunk.rank is not None else position
+            # Citation numbers follow final context order so reranked and
+            # neighboring chunks always receive deterministic unique IDs.
+            idx = position
 
             doc_title = doc_title_map.get(
                 chunk.document_id,
@@ -245,7 +243,9 @@ class RAGService:
                         "chunk_id": chunk.chunk_id,
                         "document_id": chunk.document_id,
                         "reranker_rank": chunk.rank,
-                        "citation_index": (chunk.rank if chunk.rank is not None else position),
+                        "citation_index": position,
+                        "context_role": chunk.context_role,
+                        "neighbor_of": chunk.neighbor_of,
                     }
                     for position, chunk in enumerate(ordered_chunks, start=1)
                 ]
@@ -268,7 +268,7 @@ class RAGService:
         user_id: int,
         sql_db: Session,
         notebook_id: int,
-        top_k: int = 5,
+        top_k: int = 8,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> RAGResponse:
         trace = create_evaluation_trace(
@@ -351,7 +351,7 @@ class RAGService:
         user_id: int,
         sql_db: Session,
         notebook_id: int,
-        top_k: int = 5,
+        top_k: int = 8,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ):
         """

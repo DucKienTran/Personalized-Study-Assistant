@@ -85,6 +85,10 @@ class DocumentProcessingService:
                 processed_document.chunks, processed_document.chunk_metadata
             ):
                 cm.chunk_id = f"doc_{document_id}_{cm.chunk_id}"
+                if cm.previous_chunk:
+                    cm.previous_chunk = f"doc_{document_id}_{cm.previous_chunk}"
+                if cm.next_chunk:
+                    cm.next_chunk = f"doc_{document_id}_{cm.next_chunk}"
 
             # Trich xuat du lieu classification
             language_val = None
@@ -125,6 +129,12 @@ class DocumentProcessingService:
 
                     if cm.header_path:
                         metadata["header_path"] = cm.header_path
+
+                    if cm.previous_chunk:
+                        metadata["previous_chunk"] = cm.previous_chunk
+
+                    if cm.next_chunk:
+                        metadata["next_chunk"] = cm.next_chunk
 
                     if categories_val:
                         metadata["categories"] = categories_val

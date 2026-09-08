@@ -36,7 +36,7 @@ def auth_headers():
         headers["Cookie"] = cookie
     return headers
 
-def run_query(session, url, notebook_id, question, top_k=5, conversation_id=None, chat_history=None, timeout=180):
+def run_query(session, url, notebook_id, question, top_k=8, conversation_id=None, chat_history=None, timeout=180):
     payload = {
         "query": question,
         "notebook_id": notebook_id,

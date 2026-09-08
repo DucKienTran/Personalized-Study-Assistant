@@ -78,6 +78,15 @@ class FakeRanker:
         )
 
 
+class CapturingRanker:
+    def __init__(self):
+        self.passages = []
+
+    def rerank(self, request):
+        self.passages = request.passages
+        return [{"id": passage["id"], "score": 1.0} for passage in request.passages]
+
+
 def build_retrieval_service() -> RetrievalService:
     service = RetrievalService.__new__(RetrievalService)
     service.embedding_service = FakeEmbeddingService()
@@ -97,6 +106,28 @@ def build_trace():
         candidate_multiplier=CANDIDATE_MULTIPLIER,
         rrf_k=RRF_K,
     )
+
+
+def test_reranker_passage_includes_header_path():
+    service = build_retrieval_service()
+    service.ranker = CapturingRanker()
+    candidate = RetrievalResult(
+        chunk_id="chunk-a",
+        document_id=1,
+        text="Renew within 30 days.",
+        header_path=["ASTER ENTERPRISE - SERVICE POLICY 2026", "Renewal"],
+    )
+
+    assert service.rerank("renewal policy", [candidate], top_k=1) == [candidate]
+    assert service.ranker.passages == [
+        {
+            "id": "chunk-a",
+            "text": (
+                "Section: ASTER ENTERPRISE - SERVICE POLICY 2026 > Renewal\n\n"
+                "Renew within 30 days."
+            ),
+        }
+    ]
 
 
 @pytest.mark.asyncio
